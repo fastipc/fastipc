@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for Python: shared-memory IPC (fipc-python on PyPI)</title>
+<meta name="description" content="Shared-memory IPC in Python: pip install fipc-python, then Listener and Conn for messages and RPC between two processes on one machine.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/python.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for Python: shared-memory IPC (fipc-python on PyPI)">
+<meta property="og:description" content="Shared-memory IPC in Python: pip install fipc-python, then Listener and Conn for messages and RPC between two processes on one machine.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/python.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for Python: shared-memory IPC (fipc-python on PyPI)">
+<meta name="twitter:description" content="Shared-memory IPC in Python: pip install fipc-python, then Listener and Conn for messages and RPC between two processes on one machine.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html" aria-current="page">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">fipc-python on PyPI · import fipc</span>
+    <h1>Python</h1>
+    <p class="lede">Two classes, <code>Listener</code> and <code>Conn</code>, over the C API through CFFI's ABI mode: the native library is loaded at run time, so there is nothing to compile. A call that doesn't return OK raises <code>FipcError</code>. The wheels carry the library for Windows x64, Linux x64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon; one wheel per platform fits every Python 3.9+.</p>
+    <div class="install" style="max-width:520px"><span class="lang">Install</span><code>pip install fipc-python</code><button class="copy" type="button" data-copy="pip install fipc-python">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#scaling">IPC overhead</a><a href="#messages">Plain messages</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#threads">Threads</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals: <code>Conn.connect</code> waits up to its timeout for a server to listen and accept. Both classes are context managers. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client (<a href="index.html#interop">every pair of languages is tested</a>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Listener
+
+# rings of 1 MiB each way
+with Listener("my_channel", 1 &lt;&lt; 20) as listener:
+    with listener.accept() as conn:  # waits for a client
+        request = conn.rpc_recv()
+        conn.rpc_respond(request.id, request.opcode,
+                         data=request.payload.upper())</code></pre></div>
+      <div class="code"><div class="label"><span>client.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Conn
+
+with Conn.connect("my_channel", timeout_ms=5000) as conn:
+    conn.rpc_submit(1, b"ping")     # opcode 1
+    print(conn.rpc_recv().payload)  # b'PING'</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="scaling" aria-labelledby="h-scaling">
+    <div class="plate-head"><h2 id="h-scaling">IPC overhead</h2><span class="eyebrow">what it costs to hand work to other processes, measured</span></div>
+    <p class="intro">Worker processes speed a job up only if talking to them is cheap. Every task crosses between processes twice, and that communication overhead, not the work, sets the limit. With one dispatcher handing out tasks of time <i>t</i> to <i>P</i> workers:</p>
+    <div class="formula">
+      <img class="formula-img img-light" src="assets/formula-light.png" width="854" height="136" alt="" aria-hidden="true">
+      <img class="formula-img img-dark" src="assets/formula-dark.png" width="854" height="136" alt="" aria-hidden="true">
+      <div class="math-text">
+      <math display="block" aria-label="S equals 1 over (c over t plus (1 plus R over t) over P), at most t over c">
+        <mi>S</mi><mo>=</mo>
+        <mfrac><mn>1</mn><mrow><mfrac><mi>c</mi><mi>t</mi></mfrac><mo>+</mo><mfrac><mrow><mn>1</mn><mo>+</mo><mi>R</mi><mo>/</mo><mi>t</mi></mrow><mi>P</mi></mfrac></mrow></mfrac>
+        <mo>&le;</mo><mfrac><mi>t</mi><mi>c</mi></mfrac>
+      </math>
+      <dl class="vars">
+        <dt><i>S</i></dt><dd>speedup: how many times faster the job finishes than in one process</dd>
+        <dt><i>P</i></dt><dd>worker processes</dd>
+        <dt><i>t</i></dt><dd>time one task takes to compute</dd>
+        <dt><i>R</i></dt><dd>round trip: send a task to a worker and get its result back</dd>
+        <dt><i>c</i></dt><dd>the dispatcher's own time per task, handing it out and taking its result</dd>
+      </dl>
+      </div>
+    </div>
+    <p class="intro">However many workers, the job runs at most <i>t</i>&nbsp;/&nbsp;<i>c</i> times as fast. Python's own channels cost 20 to 70&nbsp;µs a round trip and 8 to 56&nbsp;µs of the dispatcher's time a task: tasks of 20&nbsp;µs gain nothing from a pool fed through <code>multiprocessing.Queue</code>. FastIPC's round trip, Python to Python, is about 2&nbsp;µs, so tasks of tens of microseconds scale across the cores. Every point on the chart is measured.</p>
+    <div class="scaling" id="scaling-chart">
+      <div class="controls">
+        <div class="control"><span>System</span><div class="seg" role="group" aria-label="System"><button type="button" data-os="windows">Windows</button><button type="button" data-os="linux">Linux</button></div></div>
+        <div class="control"><span>Task time <i>t</i></span><div class="range"><input type="range" min="0" max="7" step="1" value="3" aria-label="Task time" id="scaling-task"><output for="scaling-task">50 µs</output></div></div>
+      </div>
+      <div class="controls">
+        <div class="toggles" role="group" aria-label="Transports shown">
+          <button type="button" data-series="fipc"><svg viewBox="0 0 14 14" aria-hidden="true"></svg>FastIPC</button>
+          <button type="button" data-series="pipe"><svg viewBox="0 0 14 14" aria-hidden="true"></svg>Pipe</button>
+          <button type="button" data-series="tcp"><svg viewBox="0 0 14 14" aria-hidden="true"></svg>TCP</button>
+          <button type="button" data-series="queue"><svg viewBox="0 0 14 14" aria-hidden="true"></svg>Queue</button>
+        </div>
+      </div>
+      <figure>
+        <div class="plot"><svg viewBox="0 0 720 330" role="img" aria-label="Speedup over one process by number of worker processes, measured per transport, against free IPC; the table below gives each transport's costs, ceiling and best speedup"></svg></div>
+        <figcaption><span class="scaling-summary"></span> Dashed grey: free IPC (<i>c</i>&nbsp;=&nbsp;<i>R</i>&nbsp;=&nbsp;0), <i>P</i> times as fast. Solid grey, at 1×: one process doing every task itself.</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:14px">
+        <table class="data">
+          <thead><tr><th scope="col">Transport</th><th scope="col" class="n">Round trip <i>R</i></th><th scope="col" class="n">Dispatcher <i>c</i></th><th scope="col" class="n">Ceiling <i>t</i>&nbsp;/&nbsp;<i>c</i></th><th scope="col" class="n">Best measured</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:14px"><b>Where the formula comes from.</b> Amdahl's law: if a share <i>s</i> of the work must run in one place, <i>P</i> workers finish it at most 1&nbsp;/&nbsp;(<i>s</i>&nbsp;+&nbsp;(1&nbsp;&minus;&nbsp;<i>s</i>)&nbsp;/&nbsp;<i>P</i>) times as fast. Handing tasks to worker processes creates such a share even when the work itself splits perfectly: only the dispatcher can send a task and take its result, so its <i>c</i> per task acts as the serial share <i>c</i>/<i>t</i>, and a worker waits a round trip <i>R</i> for every task, which stretches each task to <i>t</i>&nbsp;+&nbsp;<i>R</i>. However many workers there are, the job never runs more than <i>t</i>&nbsp;/&nbsp;<i>c</i> times as fast.</p>
+      <p class="note" style="margin-top:10px"><span class="scaling-meta"></span> One dispatcher process gives each worker one task at a time and takes the results in turn; each task and result is 64 bytes. <i>R</i> is the round trip with one worker; <i>c</i> the dispatcher's time per task with 2 to 12 workers, the tasks doing no work. Each point is the median of 3 runs.</p>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>send</code> takes <code>bytes</code> of any size, and <code>recv</code> returns each message whole. This server echoes every message back until its client leaves, which ends its next <code>recv</code> with <code>DISCONNECTED</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Listener, FipcError, Result
+
+# rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+with Listener("demo", 1 &lt;&lt; 20) as listener:
+    with listener.accept() as conn:
+        try:
+            while True:
+                msg = conn.recv()     # bytes, any size
+                conn.send(msg)        # echo it back
+        except FipcError as e:
+            if e.result != Result.DISCONNECTED:
+                raise
+            print("client gone")</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Conn
+
+with Conn.connect("demo", timeout_ms=5000) as conn:
+    for word in (b"hello", b"shared", b"memory"):
+        conn.send(word)
+        print(conn.recv())</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">FipcError.result is a Result</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>Every waiting call takes <code>timeout_ms</code>: <code>NO_WAIT</code> (0) doesn't wait, <code>FOREVER</code> (−1, the default) waits for ever. Any result other than OK raises <code>FipcError</code>, whose <code>result</code> says which: <code>TIMEOUT</code>, <code>DISCONNECTED</code>, <code>CANCELLED</code>, <code>TOO_LARGE</code>, <code>INVALID</code>, <code>NO_MEMORY</code> or <code>ADDR_IN_USE</code>.</p>
+        <p><code>DISCONNECTED</code> is final for that connection: close it, then accept or connect a new one.</p>
+      </div>
+      <div class="code"><div class="label"><span>poll without blocking</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import FipcError, Result
+
+try:
+    msg = conn.recv(timeout_ms=100)
+except FipcError as e:
+    if e.result == Result.TIMEOUT:
+        msg = None            # nothing yet
+    else:
+        raise</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.max_piece() bytes</span></div>
+    <p class="intro">Write into a <code>memoryview</code> of the ring and commit; read a read-only <code>memoryview</code> of the ring and release it. A view stays valid until its release, the next receive, or <code>close</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">buf = conn.send_acquire(5)    # writable memoryview
+buf[:] = b"hello"
+conn.send_commit(5)</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">view = conn.recv_acquire()    # read-only memoryview
+handle(view)
+conn.recv_release()           # frees its room</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">RpcMessage(id, kind, opcode, status, payload)</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status. Either side may submit. Use a connection for RPC or for plain messages, not both. This server answers requests until its client leaves, and this client checks what came back; either makes the exchange above with the other half in any language.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>rpc_server.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import (Listener, FipcError, Result,
+                         RPC_REQUEST)
+
+UPPER = 1
+
+with Listener("my_channel", 1 &lt;&lt; 20) as listener, \
+        listener.accept() as conn:
+    try:
+        while True:
+            req = conn.rpc_recv()
+            if req.kind == RPC_REQUEST and req.opcode == UPPER:
+                conn.rpc_respond(req.id, req.opcode, status=0,
+                                 data=req.payload.upper())
+    except FipcError as e:
+        if e.result != Result.DISCONNECTED:
+            raise</code></pre></div>
+      <div class="code"><div class="label"><span>rpc_client.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Conn, RPC_RESPONSE
+
+UPPER = 1
+
+with Conn.connect("my_channel", timeout_ms=5000) as conn:
+    req_id = conn.rpc_submit(UPPER, b"ping")
+    reply = conn.rpc_recv()
+    assert reply.kind == RPC_RESPONSE
+    assert reply.id == req_id
+    print(reply.status, reply.payload)   # 0 b'PING'</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads</h2><span class="eyebrow">cancel, join, close</span></div>
+    <div class="cols">
+      <p>On a connection, one thread at a time sends and one thread at a time receives, and the two may run at once. <code>cancel()</code> works from any thread and makes every waiting call raise <code>CANCELLED</code>. <code>close()</code> needs the connection to itself, so stop a reader thread by cancelling, joining it, then closing.</p>
+      <div class="code"><div class="label"><span>stop a reader thread</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">import threading
+from fipc import FipcError
+
+def reader():
+    try:
+        while True:
+            handle(conn.recv())
+    except FipcError:
+        pass                      # CANCELLED or DISCONNECTED
+
+t = threading.Thread(target=reader)
+t.start()
+...
+conn.cancel()
+t.join()
+conn.close()</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow">fipc</span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>Listener(name, capacity)</code></td><td>Claims the name and listens; <code>ADDR_IN_USE</code> if another listener holds it.</td></tr>
+          <tr><td><code>listener.accept(timeout_ms)</code></td><td>Sets the next client's connection up on the calling thread and returns its <code>Conn</code>. One client at a time: close it before the next accept. <code>NO_WAIT</code> polls.</td></tr>
+          <tr><td><code>listener.cancel()</code> · <code>close()</code></td><td>Cancel waiting accepts (any thread) · stop listening; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>Conn.connect(name, timeout_ms)</code></td><td>Connects to the server listening on the name, waiting for it to listen and accept: client and server run on different threads or processes.</td></tr>
+          <tr><td><code>send(data)</code> · <code>recv()</code></td><td>Copy one message of any size in · out, as <code>bytes</code>.</td></tr>
+          <tr><td><code>recv_into(buf)</code></td><td>Receives into your <code>bytearray</code> or <code>memoryview</code> and returns the length.</td></tr>
+          <tr><td><code>send_acquire(n)</code> · <code>send_commit(n)</code></td><td>Zero-copy send.</td></tr>
+          <tr><td><code>recv_acquire()</code> · <code>recv_release()</code></td><td>Zero-copy receive.</td></tr>
+          <tr><td><code>rpc_submit(opcode, data)</code></td><td>Sends a request; returns its id.</td></tr>
+          <tr><td><code>rpc_respond(id, opcode, status, data)</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>rpc_recv()</code></td><td>Receives one request or response as an <code>RpcMessage</code>.</td></tr>
+          <tr><td><code>max_piece()</code> · <code>cancel()</code> · <code>close()</code></td><td>The zero-copy limit · cancel waiting calls (any thread) · end the connection.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding, copied 16-byte messages run at about 1.5 to 1.9 million per second, and 64 KiB messages at 330,000 to 360,000 per second (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+<script src="assets/scaling-data.js"></script>
+<script src="assets/scaling.js"></script>
+</body>
+</html>

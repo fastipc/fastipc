@@ -1,0 +1,67 @@
+# Zig: build outputs, caches and fetched packages
+/.zig-cache
+/.zig-global-cache
+/zig-out
+/zig-pkg
+
+# Other revisions' libraries built by `devtool bench-compare --ab`
+/.bench-libs/
+
+# Compilation database (`zig build cdb`)
+compile_commands.json
+
+# The devtool's Python venv (created by devtool.py) and machine-local settings
+venv/
+devtool_config.local.json
+
+# Python
+__pycache__/
+*.egg-info/
+*.pyc
+*.pyo
+build/
+dist/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.nupkg
+*.snupkg
+
+# Native libraries and objects outside zig-out
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+*.pdb
+*.exe
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local tool settings
+.claude/settings.local.json
+
+# Gradle (the Java binding; its outputs go to build/, ignored above)
+.gradle/
+.kotlin/
+
+# Cargo (the Rust binding and its benchmark)
+target/
+
+# Vendored packages (vendor/README.md) are tracked whole, their build/ folders (build-script sources) included
+!/vendor/*/build/
+
+# JavaScript (the binding's packaged prebuilds/, installed packages)
+node_modules/
+/bindings/js/prebuilds/
+
+# Go (the binding's native/ libraries, committed only on the release tag's commit)
+/bindings/go/fipc/native/

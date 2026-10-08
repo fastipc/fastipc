@@ -1,0 +1,1438 @@
+name: Release
+
+# A pushed tag v<version> (v1.0.0) builds, checks and smoke-tests every package on Linux (x86-64 and ARM64), Windows
+# and macOS, waits for a maintainer's approval (the approve job), then publishes them all: the wheels to PyPI
+# (fipc-python), the NuGet package (Fipc), the Maven artifact to Maven Central (io.github.fastipc:fipc), the crates to
+# crates.io (fipc-sys, fipc), the rock to LuaRocks (fipc), the npm package to npm (fipc), the Go module as the tag
+# bindings/go/v<version> (github.com/fastipc/fastipc/bindings/go), and the C/C++ archives (the header and the libraries) and the
+# rock's archive to the tag's GitHub release. The approval needs every build job, so a tag publishes nothing unless
+# every package passed. A run by hand builds and smoke-tests the packages of the chosen ref, and publishes only when
+# that ref is a v* tag.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  # This OS's library (zig build dist, checked; on Windows with its import library; on macOS ad hoc signed; ARM64
+  # Linux's on an ARM64 runner) and its wheel, installed into a fresh venv for a round trip between two processes
+  wheel:
+    name: Wheel (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-15
+            rid: osx-arm64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, check and smoke-test the wheel
+        run: python devtool.py package python --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"}
+
+      - name: Upload the wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.rid }}
+          path: zig-out/packages/*.whl
+          if-no-files-found: error
+
+      - name: Upload the native library
+        # libfastipc.so; fastipc.dll with its import library fastipc.lib; libfastipc.dylib
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: zig-out/dist/runtimes/${{ matrix.rid }}/native/
+          if-no-files-found: error
+
+  # The NuGet package from the four libraries the wheel jobs built, each on its own OS, then restored by a console
+  # project on each OS for a round trip between two processes
+  nuget:
+    name: NuGet package
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, check and smoke-test the NuGet package
+        run: >-
+          python devtool.py package csharp --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"}
+          --linux-lib native/native-linux-x64/libfastipc.so
+          --windows-lib native/native-win-x64/fastipc.dll
+          --macos-lib native/native-osx-arm64/libfastipc.dylib
+          --linux-arm64-lib native/native-linux-arm64/libfastipc.so
+
+      - name: Upload the NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget
+          path: |
+            zig-out/packages/*.nupkg
+            zig-out/packages/*.snupkg
+          if-no-files-found: error
+
+  nuget-windows:
+    name: NuGet package on Windows
+    needs: nuget
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download the NuGet package
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget
+          path: nuget
+
+      - name: Smoke-test the NuGet package
+        run: python devtool.py smoke nuget/*.nupkg
+
+  nuget-macos:
+    name: NuGet package on macOS
+    needs: nuget
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download the NuGet package
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget
+          path: nuget
+
+      - name: Smoke-test the NuGet package
+        run: python devtool.py smoke nuget/*.nupkg
+
+  nuget-linux-arm64:
+    name: NuGet package on Linux ARM64
+    needs: nuget
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download the NuGet package
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget
+          path: nuget
+
+      - name: Smoke-test the NuGet package
+        run: python devtool.py smoke nuget/*.nupkg
+
+  # The Maven artifact (the jar with every platform's library, sources, javadoc, POM, checksums; signed when the key is given)
+  # from the libraries the wheel jobs built, then resolved by a Gradle project on each OS for a round trip between
+  # two JVMs
+  maven:
+    name: Maven artifact
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, sign, check and smoke-test the Maven artifact
+        # Gradle signs when it is given the key (an empty key would make it try to sign without one); a tag's
+        # artifact must be signed, as Maven Central requires
+        env:
+          SIGNING_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          if [[ -n "$SIGNING_KEY" ]]; then
+            export ORG_GRADLE_PROJECT_signingKey="$SIGNING_KEY" ORG_GRADLE_PROJECT_signingPassword="$SIGNING_PASSWORD"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "::error::The secret MAVEN_GPG_PRIVATE_KEY is missing: Maven Central takes only signed artifacts"
+            exit 1
+          fi
+          python devtool.py package java --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"} \
+            --linux-lib native/native-linux-x64/libfastipc.so \
+            --windows-lib native/native-win-x64/fastipc.dll \
+            --macos-lib native/native-osx-arm64/libfastipc.dylib \
+            --linux-arm64-lib native/native-linux-arm64/libfastipc.so
+
+      - name: Upload the Maven artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven
+          path: zig-out/packages/maven/
+          if-no-files-found: error
+
+  maven-windows:
+    name: Maven artifact on Windows
+    needs: maven
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Download the Maven artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maven
+          path: maven
+
+      - name: Smoke-test the Maven artifact
+        run: python devtool.py smoke maven
+
+  maven-macos:
+    name: Maven artifact on macOS
+    needs: maven
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Download the Maven artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maven
+          path: maven
+
+      - name: Smoke-test the Maven artifact
+        run: python devtool.py smoke maven
+
+  maven-linux-arm64:
+    name: Maven artifact on Linux ARM64
+    needs: maven
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Download the Maven artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maven
+          path: maven
+
+      - name: Smoke-test the Maven artifact
+        run: python devtool.py smoke maven
+
+  # The crates (fipc-sys with every platform's library, and fipc) from the libraries the wheel jobs built,
+  # packaged by cargo (which builds each as a user would), then taken by a Cargo project on each OS from a vendored
+  # source for a round trip between two processes. The workspace they were packaged from (rust/) goes along, for
+  # cargo publish.
+  crates:
+    name: Rust crates
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, check and smoke-test the crates
+        run: >-
+          python devtool.py package rust --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"}
+          --linux-lib native/native-linux-x64/libfastipc.so
+          --windows-lib native/native-win-x64/fastipc.dll
+          --macos-lib native/native-osx-arm64/libfastipc.dylib
+          --linux-arm64-lib native/native-linux-arm64/libfastipc.so
+
+      - name: Upload the crates
+        uses: actions/upload-artifact@v4
+        with:
+          name: crates
+          path: |
+            zig-out/packages/*.crate
+            zig-out/packages/rust/
+          if-no-files-found: error
+
+  crates-windows:
+    name: Rust crates on Windows
+    needs: crates
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Download the crates
+        uses: actions/download-artifact@v4
+        with:
+          name: crates
+          path: crates
+
+      - name: Smoke-test the crates
+        run: python devtool.py smoke crates/*.crate
+
+  crates-macos:
+    name: Rust crates on macOS
+    needs: crates
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Download the crates
+        uses: actions/download-artifact@v4
+        with:
+          name: crates
+          path: crates
+
+      - name: Smoke-test the crates
+        run: python devtool.py smoke crates/*.crate
+
+  crates-linux-arm64:
+    name: Rust crates on Linux ARM64
+    needs: crates
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Download the crates
+        uses: actions/download-artifact@v4
+        with:
+          name: crates
+          path: crates
+
+      - name: Smoke-test the crates
+        run: python devtool.py smoke crates/*.crate
+
+  # The Lua rock (the rockspec, and the source rock whose archive carries the module and every library) from the
+  # libraries the wheel jobs built, then installed by LuaRocks into a fresh tree on each OS for a round trip between
+  # two LuaJIT processes. LuaJIT is built from its v2.1 branch, LuaRocks taken from its release.
+  rock:
+    name: Lua rock
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup LuaJIT and LuaRocks
+        # In ~/luajit and ~/luarocks, where devtool looks for them
+        run: |
+          git clone --quiet --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT.git "$RUNNER_TEMP/LuaJIT"
+          make -C "$RUNNER_TEMP/LuaJIT" -j4 PREFIX="$HOME/luajit"
+          make -C "$RUNNER_TEMP/LuaJIT" install PREFIX="$HOME/luajit"
+          curl -fsSL https://luarocks.github.io/luarocks/releases/luarocks-3.12.2.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/luarocks-3.12.2"
+          ./configure --prefix="$HOME/luarocks" --with-lua="$HOME/luajit" --with-lua-interpreter=luajit \
+            --with-lua-include="$HOME/luajit/include/luajit-2.1"
+          make
+          make install
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, check and smoke-test the rock
+        run: >-
+          python devtool.py package lua --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"}
+          --linux-lib native/native-linux-x64/libfastipc.so
+          --windows-lib native/native-win-x64/fastipc.dll
+          --macos-lib native/native-osx-arm64/libfastipc.dylib
+          --linux-arm64-lib native/native-linux-arm64/libfastipc.so
+
+      - name: Upload the rock
+        uses: actions/upload-artifact@v4
+        with:
+          name: rock
+          path: |
+            zig-out/packages/*.rockspec
+            zig-out/packages/*.src.rock
+            zig-out/packages/fipc-lua-*.tar.gz
+          if-no-files-found: error
+
+  rock-windows:
+    name: Lua rock on Windows
+    needs: rock
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup LuaJIT and LuaRocks
+        # LuaJIT built with MSVC (msvcbuild.bat) into ~/luajit/bin, the standalone luarocks.exe in ~/luarocks: where
+        # devtool looks for them. MSVC's tools go first on PATH: Git Bash puts its /usr/bin first, whose link.exe
+        # (coreutils) would shadow MSVC's linker. msvcbuild.bat exits 0 even when the build fails, so the step checks
+        # that luajit.exe exists
+        run: |
+          git clone --quiet --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT.git "$RUNNER_TEMP/LuaJIT"
+          (cd "$RUNNER_TEMP/LuaJIT/src" &&
+            PATH="$(cygpath -u "$VCToolsInstallDir")bin/HostX64/x64:$PATH" cmd //c msvcbuild.bat)
+          if [ ! -f "$RUNNER_TEMP/LuaJIT/src/luajit.exe" ]; then
+            echo "::error::msvcbuild.bat built no luajit.exe"
+            exit 1
+          fi
+          mkdir -p ~/luajit/bin/lua/jit ~/luarocks
+          cp "$RUNNER_TEMP"/LuaJIT/src/{luajit.exe,lua51.dll} ~/luajit/bin/
+          cp "$RUNNER_TEMP"/LuaJIT/src/jit/*.lua ~/luajit/bin/lua/jit/
+          curl -fsSL -o "$RUNNER_TEMP/luarocks.zip" \
+            https://luarocks.github.io/luarocks/releases/luarocks-3.12.2-windows-64.zip
+          unzip -q -j "$RUNNER_TEMP/luarocks.zip" '*/luarocks.exe' -d ~/luarocks
+
+      - name: Download the rock
+        uses: actions/download-artifact@v4
+        with:
+          name: rock
+          path: rock
+
+      - name: Smoke-test the rock
+        run: python devtool.py smoke rock/*.src.rock
+
+  rock-macos:
+    name: Lua rock on macOS
+    needs: rock
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      # LuaJIT's makefile needs it on macOS: the library's floor
+      MACOSX_DEPLOYMENT_TARGET: '14.4'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup LuaJIT and LuaRocks
+        # In ~/luajit and ~/luarocks, where devtool looks for them, built as the rock job builds them
+        run: |
+          git clone --quiet --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT.git "$RUNNER_TEMP/LuaJIT"
+          make -C "$RUNNER_TEMP/LuaJIT" -j4 PREFIX="$HOME/luajit"
+          make -C "$RUNNER_TEMP/LuaJIT" install PREFIX="$HOME/luajit"
+          curl -fsSL https://luarocks.github.io/luarocks/releases/luarocks-3.12.2.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/luarocks-3.12.2"
+          ./configure --prefix="$HOME/luarocks" --with-lua="$HOME/luajit" --with-lua-interpreter=luajit \
+            --with-lua-include="$HOME/luajit/include/luajit-2.1"
+          make
+          make install
+
+      - name: Download the rock
+        uses: actions/download-artifact@v4
+        with:
+          name: rock
+          path: rock
+
+      - name: Smoke-test the rock
+        run: python devtool.py smoke rock/*.src.rock
+
+  rock-linux-arm64:
+    name: Lua rock on Linux ARM64
+    needs: rock
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup LuaJIT and LuaRocks
+        # In ~/luajit and ~/luarocks, where devtool looks for them, built as the rock job builds them
+        run: |
+          git clone --quiet --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT.git "$RUNNER_TEMP/LuaJIT"
+          make -C "$RUNNER_TEMP/LuaJIT" -j4 PREFIX="$HOME/luajit"
+          make -C "$RUNNER_TEMP/LuaJIT" install PREFIX="$HOME/luajit"
+          curl -fsSL https://luarocks.github.io/luarocks/releases/luarocks-3.12.2.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/luarocks-3.12.2"
+          ./configure --prefix="$HOME/luarocks" --with-lua="$HOME/luajit" --with-lua-interpreter=luajit \
+            --with-lua-include="$HOME/luajit/include/luajit-2.1"
+          make
+          make install
+
+      - name: Download the rock
+        uses: actions/download-artifact@v4
+        with:
+          name: rock
+          path: rock
+
+      - name: Smoke-test the rock
+        run: python devtool.py smoke rock/*.src.rock
+
+  # The npm package (fipc): the JavaScript binding with every platform's Node-API addon and library in
+  # prebuilds/<platform>-<arch>/. The addons are zig build dist's (they link nothing of Node.js, so one host builds
+  # every platform's), the libraries the wheel jobs built; then installed by npm into a fresh project on each OS for a
+  # round trip between two Node.js processes
+  npm:
+    name: npm package
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, check and smoke-test the npm package
+        run: >-
+          python devtool.py package js --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"}
+          --linux-lib native/native-linux-x64/libfastipc.so
+          --windows-lib native/native-win-x64/fastipc.dll
+          --macos-lib native/native-osx-arm64/libfastipc.dylib
+          --linux-arm64-lib native/native-linux-arm64/libfastipc.so
+
+      - name: Upload the npm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm
+          path: zig-out/packages/fipc-*.tgz
+          if-no-files-found: error
+
+  npm-windows:
+    name: npm package on Windows
+    needs: npm
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download the npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm
+          path: npm
+
+      - name: Smoke-test the npm package
+        run: python devtool.py smoke npm/*.tgz
+
+  npm-macos:
+    name: npm package on macOS
+    needs: npm
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download the npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm
+          path: npm
+
+      - name: Smoke-test the npm package
+        run: python devtool.py smoke npm/*.tgz
+
+  npm-linux-arm64:
+    name: npm package on Linux ARM64
+    needs: npm
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download the npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm
+          path: npm
+
+      - name: Smoke-test the npm package
+        run: python devtool.py smoke npm/*.tgz
+
+  # The Go module (github.com/fastipc/fastipc/bindings/go) as its release tag will hold it: the files of bindings/go
+  # the repository tracks, the LICENSE and every platform's library in fipc/native/<rid>/ (the libraries the wheel
+  # jobs built), checked (go vet), then required by a Go project from a file proxy on each OS, built without cgo, for
+  # a round trip between two processes. Go has no registry: publish-go commits this tree and pushes its tag.
+  go:
+    name: Go module
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Go
+        # The binding's toolchain: go.mod's go line (1.27, the newest 1.27.x)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Version expected from the tag
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "EXPECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build, check and smoke-test the Go module
+        run: >-
+          python devtool.py package go --smoke ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"}
+          --linux-lib native/native-linux-x64/libfastipc.so
+          --windows-lib native/native-win-x64/fastipc.dll
+          --macos-lib native/native-osx-arm64/libfastipc.dylib
+          --linux-arm64-lib native/native-linux-arm64/libfastipc.so
+
+      - name: Upload the Go module
+        # The tree itself (go.mod at the artifact's root), every file of it: publish-go commits exactly this
+        uses: actions/upload-artifact@v4
+        with:
+          name: go
+          path: zig-out/packages/go/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  go-windows:
+    name: Go module on Windows
+    needs: go
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+
+      - name: Download the Go module
+        uses: actions/download-artifact@v4
+        with:
+          name: go
+          path: go
+
+      - name: Smoke-test the Go module
+        run: python devtool.py smoke go
+
+  go-macos:
+    name: Go module on macOS
+    needs: go
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+
+      - name: Download the Go module
+        uses: actions/download-artifact@v4
+        with:
+          name: go
+          path: go
+
+      - name: Smoke-test the Go module
+        run: python devtool.py smoke go
+
+  go-linux-arm64:
+    name: Go module on Linux ARM64
+    needs: go
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+
+      - name: Download the Go module
+        uses: actions/download-artifact@v4
+        with:
+          name: go
+          path: go
+
+      - name: Smoke-test the Go module
+        run: python devtool.py smoke go
+
+  # The pause before anything leaves: a tag's run builds and checks every package, then waits here until a
+  # maintainer approves it (the `release` environment's required reviewer; Actions > the run > Review deployments).
+  # Nothing is published and no GitHub release is made before that, so until then the tag can still be moved
+  # (git push --force origin v<version>, then reject or cancel the waiting run). Every publish job needs this one,
+  # and this one every build job: one tag publishes everything or nothing.
+  approve:
+    name: Approve the release
+    needs: [ wheel, nuget, nuget-windows, nuget-macos, maven, maven-windows, maven-macos, crates, crates-windows,
+             crates-macos, rock, rock-windows, rock-macos, nuget-linux-arm64, maven-linux-arm64, crates-linux-arm64,
+             rock-linux-arm64, npm, npm-windows, npm-macos, npm-linux-arm64, go, go-windows, go-macos,
+             go-linux-arm64 ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: release
+    steps:
+      - name: Approved
+        run: echo "Publishing $GITHUB_REF_NAME at $GITHUB_SHA"
+
+  # The registries are separate: if one publish job fails after another succeeded, re-run the failed job.
+  publish-pypi:
+    name: Publish to PyPI
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fipc-python/
+    permissions:
+      id-token: write  # PyPI trusted publishing
+    steps:
+      - name: Download the wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        # skip-existing: a re-run after a partial upload uploads the rest
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true
+
+  publish-nuget:
+    name: Publish to NuGet
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: nuget
+      url: https://www.nuget.org/packages/Fipc
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download the NuGet package
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget
+          path: nuget
+
+      - name: Publish
+        # The .snupkg next to the .nupkg goes to NuGet's symbol server with it
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push "nuget/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  publish-maven:
+    name: Publish to Maven Central
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: maven
+      url: https://central.sonatype.com/artifact/io.github.fastipc/fipc
+    steps:
+      - name: Download the Maven artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: maven
+          path: maven
+
+      - name: Bundle
+        # The Maven repository layout (io/github/fastipc/fipc/<version>/), every file with its .asc, .md5
+        # and .sha1; without maven-metadata.xml, which Maven Central keeps itself
+        run: |
+          cd maven
+          unsigned=$(find io -type f ! -name '*.asc' ! -name '*.md5' ! -name '*.sha*' ! -name 'maven-metadata*' |
+            while read -r file; do [[ -f "$file.asc" ]] || echo "$file"; done)
+          if [[ -n "$unsigned" ]]; then
+            echo "::error::Not signed: $unsigned"
+            exit 1
+          fi
+          zip -r ../bundle.zip io -x '*/maven-metadata*'
+          unzip -l ../bundle.zip
+
+      - name: Upload to the Central Portal, and wait until it publishes
+        # publishingType=AUTOMATIC: the portal validates the bundle, then publishes it. The step waits until the
+        # portal is publishing it (PUBLISHING, then PUBLISHED), or fails with the portal's errors (FAILED).
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          token=$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 -w0)
+          api=https://central.sonatype.com/api/v1/publisher
+          id=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $token" -F "bundle=@bundle.zip" \
+            "$api/upload?name=fipc-${GITHUB_REF_NAME#v}&publishingType=AUTOMATIC")
+          echo "Deployment $id"
+          state=
+          for _ in $(seq 1 160); do
+            status=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $token" "$api/status?id=$id")
+            state=$(jq -r .deploymentState <<<"$status")
+            echo "$state"
+            case "$state" in
+              PUBLISHING|PUBLISHED) exit 0 ;;
+              FAILED) jq . <<<"$status"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Deployment $id is still $state after 40 minutes: https://central.sonatype.com/publishing/deployments"
+          exit 1
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: crates
+      url: https://crates.io/crates/fipc
+    permissions:
+      id-token: write  # crates.io trusted publishing (below)
+    steps:
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Download the crates
+        uses: actions/download-artifact@v4
+        with:
+          name: crates
+          path: crates
+
+      - name: Publish
+        # The crates of the workspace they were packaged from that crates.io doesn't have yet (both, but on a re-run
+        # after a partial publish), in dependency order: fipc-sys first. Cargo verifies each again first.
+        # Once each crate has a trusted publisher (GitHub: this repository, release.yml, environment crates), a step
+        # `uses: rust-lang/crates-io-auth-action@v1` (id: auth) before this one gives the token instead
+        # (CARGO_REGISTRY_TOKEN: steps.auth.outputs.token), and the secret can go.
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          packages=()
+          for crate in fipc-sys fipc; do
+            if curl -sf -o /dev/null -A "FastIPC release workflow" "https://crates.io/api/v1/crates/$crate/$version"; then
+              echo "$crate $version is on crates.io already"
+            else
+              packages+=(--package "$crate")
+            fi
+          done
+          if (( ${#packages[@]} )); then
+            cargo publish --manifest-path crates/rust/Cargo.toml "${packages[@]}"
+          fi
+
+  # The tarball that npm, npm-windows, npm-macos and npm-linux-arm64 built and smoke-tested, published as it is, with
+  # provenance (the package's repository is this one). npm refuses a version it has: a re-run after a successful
+  # publish skips it.
+  # After the first release: add an npm trusted publisher for fipc (organization fastipc, repository fastipc,
+  # workflow release.yml, environment npm), then remove NODE_AUTH_TOKEN below and delete the NPM_TOKEN secret.
+  publish-npm:
+    name: Publish to npm
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/fipc
+    permissions:
+      contents: read
+      id-token: write  # npm provenance
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - name: Download the npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm
+          path: npm
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          if npm view "fipc@$version" version > /dev/null 2>&1; then
+            echo "fipc $version is on npm already"
+          else
+            npm publish "npm/fipc-$version.tgz" --provenance --access public
+          fi
+
+  # The Go module: Go takes a module from its repository's tags (the module proxy fetches it, pkg.go.dev learns of it
+  # from the proxy), so publishing is pushing the tag bindings/go/v<version>. It points to a commit whose parent is
+  # the release tag's commit and which adds to bindings/go the files of the tree that go, go-windows, go-macos and
+  # go-linux-arm64 built and smoke-tested: the LICENSE and fipc/native/<rid>/ (ignored everywhere else). No branch
+  # carries that commit, only the tag; its author and committer are the release commit's. The tag starts no run of
+  # this workflow: it doesn't match the trigger's v* (a tag pattern matches from the name's start, and its * no /),
+  # and a push with the workflow's token starts no workflow anyway. A re-run finds the tag on the remote and checks
+  # it (one parent, the release tag's commit; the same tree as this run's commit) instead of pushing it again, and
+  # fails if it differs: once the proxy has served a version, the checksum database keeps its hash, so the tag must
+  # never move.
+  publish-go:
+    name: Publish the Go module
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: go
+      url: https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc
+    permissions:
+      contents: write  # pushes the tag bindings/go/v<version>
+    steps:
+      - name: Checkout code
+        # The release tag's commit, with the history (the new commit's parent) and the tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+
+      - name: Download the Go module
+        uses: actions/download-artifact@v4
+        with:
+          name: go
+          path: ${{ runner.temp }}/go
+
+      - name: Commit the module's tree and push its tag
+        # An annotated tag: it records who tagged and when, and git describe and the GitHub UI treat it as a release
+        # point; the Go proxy takes either kind
+        run: |
+          set -euo pipefail
+          version=${GITHUB_REF_NAME#v}
+          tag=bindings/go/v$version
+          tree=$RUNNER_TEMP/go
+          release=$(git rev-parse "$GITHUB_REF_NAME^{commit}")
+          if [[ "$(git rev-parse HEAD)" != "$release" ]]; then
+            echo "::error::The checkout is $(git rev-parse HEAD), not $GITHUB_REF_NAME's commit $release"
+            exit 1
+          fi
+
+          # bindings/go becomes the tree exactly: the release's files, plus the LICENSE and the libraries
+          cp "$tree/LICENSE" bindings/go/LICENSE
+          cp -R "$tree/fipc/native" bindings/go/fipc/
+          git add -f bindings/go/LICENSE bindings/go/fipc/native
+          diff -r "$tree" bindings/go
+          git diff --quiet
+          added=$(git diff --cached --name-status)
+          echo "$added"
+          if grep -qv '^A' <<<"$added"; then
+            echo "::error::The commit would change files of the release; it may only add the LICENSE and the libraries"
+            exit 1
+          fi
+
+          name=$(git log -1 --format=%an "$release")
+          email=$(git log -1 --format=%ae "$release")
+          export GIT_AUTHOR_NAME="$name" GIT_AUTHOR_EMAIL="$email" GIT_COMMITTER_NAME="$name" GIT_COMMITTER_EMAIL="$email"
+          git commit --quiet -m "bindings/go v$version: the native libraries" \
+            -m "The LICENSE and every platform's library in fipc/native/<rid>/, for the Go module's tag $tag; no branch carries this commit."
+          commit=$(git rev-parse HEAD)
+          git log -1 --format='%H %an <%ae> | %cn <%ce>%n%s' "$commit"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            git fetch --quiet --no-tags origin "refs/tags/$tag"
+            existing=$(git rev-parse "FETCH_HEAD^{commit}")
+            parents=$(git rev-list --parents -n 1 "$existing" | cut -d' ' -f2-)
+            if [[ "$parents" != "$release" ]]; then
+              echo "::error::$tag is on the remote, on $existing, whose parents ($parents) are not $GITHUB_REF_NAME's commit $release"
+              exit 1
+            fi
+            if [[ "$(git rev-parse "$existing^{tree}")" != "$(git rev-parse "$commit^{tree}")" ]]; then
+              echo "::error::$tag is on the remote, on $existing, whose tree differs from this run's"
+              git diff --stat "$existing" "$commit"
+              exit 1
+            fi
+            echo "$tag is on the remote already ($existing: $GITHUB_REF_NAME's commit as its parent, this run's tree); not pushed again"
+          else
+            # A push without --force: if the tag appeared meanwhile, the remote refuses it
+            git tag -a "$tag" -m "bindings/go v$version" "$commit"
+            git push origin "refs/tags/$tag"
+          fi
+
+      - name: Ask the Go module proxy for the version
+        # The proxy fetches the tag from GitHub on the first request (it can lag behind a fresh push), checks the
+        # module against the checksum database, and lists the version for pkg.go.dev. The module it serves must be
+        # the tree this run committed (the libraries included: the proxy zips the commit, which ignores .gitignore).
+        working-directory: ${{ runner.temp }}
+        env:
+          GOPROXY: https://proxy.golang.org
+          GOTOOLCHAIN: local
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          module=github.com/fastipc/fastipc/bindings/go
+          for attempt in $(seq 1 20); do
+            if served=$(go mod download -json "$module@v$version"); then
+              dir=$(jq -r .Dir <<<"$served")
+              echo "$module v$version: $(jq -r .Sum <<<"$served"), in $dir"
+              diff -r go "$dir"
+              exit 0
+            fi
+            echo "Attempt $attempt: the proxy doesn't serve $module v$version yet"
+            sleep 30
+          done
+          echo "::error::The Go module proxy didn't serve $module v$version within 10 minutes: re-run this job"
+          exit 1
+
+  # The C and C++ download: an archive per OS with the header and the library the packages carry (on Windows with
+  # its import library; on macOS the ad hoc signed dylib), and their checksums, on the tag's GitHub release, with the CHANGELOG's section as its notes
+  github-release:
+    name: GitHub release
+    needs: approve
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # creates the release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download the native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+
+      - name: Download the rock
+        # Its archive (the Lua module and every platform's library) is the rockspec's source URL
+        uses: actions/download-artifact@v4
+        with:
+          name: rock
+          path: rock
+
+      - name: Archives and checksums
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir release
+          win=fastipc-$version-win-x64
+          mkdir -p "$win/include" "$win/bin" "$win/lib"
+          cp include/fipc.h include/fipc.hpp "$win/include/"
+          cp native/native-win-x64/fastipc.dll "$win/bin/"
+          cp native/native-win-x64/fastipc.lib "$win/lib/"
+          cp LICENSE "$win/"
+          zip -r "release/$win.zip" "$win"
+          linux=fastipc-$version-linux-x64
+          mkdir -p "$linux/include" "$linux/lib"
+          cp include/fipc.h include/fipc.hpp "$linux/include/"
+          cp native/native-linux-x64/libfastipc.so "$linux/lib/"
+          cp LICENSE "$linux/"
+          tar -czf "release/$linux.tar.gz" "$linux"
+          macos=fastipc-$version-osx-arm64
+          mkdir -p "$macos/include" "$macos/lib"
+          cp include/fipc.h include/fipc.hpp "$macos/include/"
+          cp native/native-osx-arm64/libfastipc.dylib "$macos/lib/"
+          cp LICENSE "$macos/"
+          tar -czf "release/$macos.tar.gz" "$macos"
+          arm64=fastipc-$version-linux-arm64
+          mkdir -p "$arm64/include" "$arm64/lib"
+          cp include/fipc.h include/fipc.hpp "$arm64/include/"
+          cp native/native-linux-arm64/libfastipc.so "$arm64/lib/"
+          cp LICENSE "$arm64/"
+          tar -czf "release/$arm64.tar.gz" "$arm64"
+          cp "rock/fipc-lua-$version.tar.gz" release/
+          (cd release && sha256sum -- * > SHA256SUMS)
+          cat release/SHA256SUMS
+
+      - name: Release notes
+        # The version's section of CHANGELOG.md, its relative links made absolute (the tag's files)
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v head="## [$version]" 'index($0, head) == 1 { on = 1; next }
+            on && (/^## \[/ || /^\[[^]]+\]: /) { exit } on { print }' CHANGELOG.md |
+            sed -E "s#\]\(([^):]+)\)#](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/\1)#g" > notes.md
+          if [[ -z "$(tr -d '[:space:]' < notes.md)" ]]; then
+            echo "::error::CHANGELOG.md has no section [$version]"
+            exit 1
+          fi
+          cat notes.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" release/* --verify-tag
+          --title "FastIPC ${GITHUB_REF_NAME#v}" --notes-file notes.md
+
+  # The rockspec and the source rock that rock, rock-windows, rock-macos and rock-linux-arm64 built and smoke-tested,
+  # uploaded as they are (nothing is packed again). After github-release, so that the rockspec's source URL (the release's
+  # fipc-lua-<version>.tar.gz) exists once the rock is public. luarocks.org refuses a revision it has: a re-run
+  # after a successful upload skips it.
+  publish-luarocks:
+    name: Publish to LuaRocks
+    needs: [ approve, github-release ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: luarocks
+      url: https://luarocks.org/modules/fastipc/fipc
+    steps:
+      - name: Setup LuaRocks
+        # luarocks upload needs only LuaRocks itself (with any Lua) and curl
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends luarocks
+
+      - name: Download the rock
+        uses: actions/download-artifact@v4
+        with:
+          name: rock
+          path: rock
+
+      - name: Publish
+        env:
+          LUAROCKS_API_KEY: ${{ secrets.LUAROCKS_API_KEY }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          if curl -sf -o /dev/null "https://luarocks.org/manifests/fastipc/fipc-$version-1.rockspec"; then
+            echo "fipc $version-1 is on luarocks.org already"
+          else
+            luarocks upload --api-key "$LUAROCKS_API_KEY" \
+              "rock/fipc-$version-1.rockspec" "rock/fipc-$version-1.src.rock"
+          fi

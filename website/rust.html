@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for Rust: shared-memory IPC crates (fipc)</title>
+<meta name="description" content="Shared-memory IPC in Rust: the crates fipc and fipc-sys, a safe Listener and Connection for messages and RPC between two processes.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/rust.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for Rust: shared-memory IPC crates (fipc)">
+<meta property="og:description" content="Shared-memory IPC in Rust: the crates fipc and fipc-sys, a safe Listener and Connection for messages and RPC between two processes.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/rust.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for Rust: shared-memory IPC crates (fipc)">
+<meta name="twitter:description" content="Shared-memory IPC in Rust: the crates fipc and fipc-sys, a safe Listener and Connection for messages and RPC between two processes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html" aria-current="page">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">fipc on crates.io · use fipc</span>
+    <h1>Rust</h1>
+    <p class="lede">A safe API, <code>Listener</code> and <code>Connection</code>, over the raw FFI crate <code>fipc-sys</code>, for Rust 1.85 and later, with no other dependencies. Calls return <code>Result&lt;T, Error&gt;</code>; handles close when dropped; the borrow checker keeps the C API's rules on threads and zero-copy buffers. The <code>-sys</code> crate carries the native library for Windows x64, Linux x64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon, and links it.</p>
+    <div class="install" style="max-width:620px"><span class="lang">Cargo</span><code>cargo add fipc</code><button class="copy" type="button" data-copy="cargo add fipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Plain messages</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#interop">Any language</a><a href="#threads">Threads</a><a href="#games">Frame loops</a><a href="#setup">Install and ship</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals: <code>Connection::connect</code> waits up to its timeout for a server to listen and accept. Each file is a program of its own (<code>src/main.rs</code>, or an example: <code>cargo run --example server</code>). A timeout is anything that converts into an <code>Option&lt;Duration&gt;</code>: <code>None</code> waits as long as it takes. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::Listener;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut listener = Listener::listen("my_channel", 1 &lt;&lt; 20)?; // rings of 1 MiB each way
+    let mut conn = listener.accept(None)?; // waits for a client
+    let request = conn.rpc_receive(None)?;
+    conn.rpc_respond(request.id, request.opcode, 0, &amp;request.payload.to_ascii_uppercase(), None)?;
+    Ok(())
+}</code></pre></div>
+      <div class="code"><div class="label"><span>client.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::Connection;
+use std::time::Duration;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut conn = Connection::connect("my_channel", Duration::from_secs(5))?;
+    conn.rpc_submit(1, b"ping", None)?; // opcode 1
+    println!("{}", String::from_utf8_lossy(&amp;conn.rpc_receive(None)?.payload)); // PING
+    Ok(())
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>send</code> takes a message of any size, and <code>receive</code> returns each one whole in a new <code>Vec</code> (or fills your buffer). This server echoes every message back until its client leaves, which ends its next <code>receive</code> with <code>Error::Disconnected</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::{Error, Listener};
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    // rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+    let mut listener = Listener::listen("demo", 1 &lt;&lt; 20)?;
+    let mut conn = listener.accept(None)?; // waits for a client
+    loop {
+        match conn.receive(None) {
+            Ok(message) =&gt; conn.send(&amp;message, None)?, // echo, any size
+            Err(Error::Disconnected) =&gt; break,
+            Err(e) =&gt; return Err(e),
+        }
+    }
+    println!("client gone");
+    Ok(())
+}</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::Connection;
+use std::time::Duration;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut conn = Connection::connect("demo", Duration::from_secs(5))?;
+    for word in ["hello", "shared", "memory"] {
+        conn.send(word.as_bytes(), None)?;
+        println!("{}", String::from_utf8_lossy(&amp;conn.receive(None)?));
+    }
+    Ok(())
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">fipc::Error mirrors fipc_result_t</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>Every call that can fail returns <code>fipc::Result&lt;T&gt;</code>. <code>Error</code> is an enum: <code>Timeout</code>, <code>Disconnected</code>, <code>Cancelled</code>, <code>TooLarge { len }</code> (the room a receive needs; the message stays queued), <code>Invalid</code>, <code>NoMemory</code> or <code>AddrInUse</code>. It implements <code>std::error::Error</code>, displays the C name (<code>FIPC_TIMEOUT: the timeout ran out</code>) and converts into <code>std::io::Error</code>.</p>
+        <p>The timeout comes last: a <code>Duration</code>, <code>NO_WAIT</code> (doesn't wait), or <code>None</code> / <code>FOREVER</code>. <code>Disconnected</code> is final for that connection: drop it, then accept or connect a new one.</p>
+      </div>
+      <div class="code"><div class="label"><span>wait at most 100 ms</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">match conn.receive(Duration::from_millis(100)) {
+    Ok(message) =&gt; handle(&amp;message),
+    Err(Error::Timeout) =&gt; {} // nothing yet
+    Err(e) =&gt; return Err(e),  // Error::Disconnected: the peer is gone
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.max_piece() bytes</span></div>
+    <p class="intro">Write into a <code>SendSlot</code> of the ring and commit it; read a <code>ReceiveSlot</code> of the ring, which frees its room when dropped. Both deref to <code>[u8]</code>. A slot borrows its side of the connection, so the borrow checker keeps it from outliving its turn: nothing else is sent (or received) while it lives. Dropping a <code>SendSlot</code> without committing it sends nothing.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">let mut slot = conn.send_acquire(5, None)?; // room in the ring
+slot.copy_from_slice(b"hello");
+slot.commit(5)?;</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">let message = conn.receive_acquire(None)?; // read-only, in the ring
+handle(&amp;message);
+drop(message); // frees its room</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">RpcMessage { id, kind, opcode, status, payload }</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status. Either side may submit. <code>rpc_receive</code> returns each payload in a new <code>Vec</code>; <code>rpc_receive_into</code> fills your buffer and returns an <code>RpcHeader</code>, with no allocation per message. Use a connection for RPC or for plain messages, not both. This server answers requests until its client leaves, and this client checks what came back; either makes the exchange above with the other half in any language.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>rpc_server.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::{Error, Listener, RpcKind};
+
+const UPPER: u32 = 1;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut listener = Listener::listen("my_channel", 1 &lt;&lt; 20)?;
+    let mut conn = listener.accept(None)?;
+    loop {
+        let req = match conn.rpc_receive(None) {
+            Ok(req) =&gt; req,
+            Err(Error::Disconnected) =&gt; return Ok(()),
+            Err(e) =&gt; return Err(e),
+        };
+        if req.kind == RpcKind::Request &amp;&amp; req.opcode == UPPER {
+            conn.rpc_respond(req.id, req.opcode, 0, &amp;req.payload.to_ascii_uppercase(), None)?;
+        }
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>rpc_client.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::{Connection, RpcKind};
+use std::time::Duration;
+
+const UPPER: u32 = 1;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut conn = Connection::connect("my_channel", Duration::from_secs(5))?;
+    let id = conn.rpc_submit(UPPER, b"ping", None)?;
+    let reply = conn.rpc_receive(None)?;
+    assert!(reply.kind == RpcKind::Response &amp;&amp; reply.id == id);
+    println!("{} {}", reply.status, String::from_utf8_lossy(&amp;reply.payload)); // 0 PING
+    Ok(())
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol</span></div>
+    <p class="intro">The <code>server.rs</code> and <code>client.rs</code> above work with a peer in any of the ten languages: <a href="index.html#interop">every pair of languages is tested</a>.</p>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads</h2><span class="eyebrow">Send + Sync · &amp;mut self · Canceler</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>Listener</code>, <code>Connection</code> and its halves are <code>Send</code> and <code>Sync</code>. Calls that send or receive take <code>&amp;mut self</code>, which is the C API's rule: one thread at a time sends, one at a time receives. To do both at once on two threads, <code>split()</code> the connection into its <code>Sender</code> and <code>Receiver</code> (borrowed) or <code>into_split()</code> it (owned); it closes when the last half is dropped.</p>
+        <p>To stop a thread that waits, take a <code>Canceler</code> first and call <code>cancel()</code> from any thread: every call that waits, then or later, returns <code>Error::Cancelled</code>. Then join the thread and drop the handle. A canceler doesn't keep the connection open.</p>
+      </div>
+      <div class="code"><div class="label"><span>stop a reader thread</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">let canceler = conn.canceler();
+let reader = std::thread::spawn(move || {
+    // until Error::Cancelled (or Error::Disconnected)
+    while let Ok(message) = conn.receive(None) {
+        handle(&amp;message);
+    }
+});
+// ...
+canceler.cancel(); // wakes the reader: Cancelled
+reader.join().unwrap();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="games" aria-labelledby="h-games">
+    <div class="plate-head"><h2 id="h-games">Games and frame loops</h2><span class="eyebrow">never block a frame</span></div>
+    <p class="intro">Poll the connection once a frame with <code>NO_WAIT</code>, or give its <code>Receiver</code> to a thread that forwards messages through a channel the frame loop drains. In Bevy, a <code>Connection</code> (or the channel's receiving end) fits in a <code>Resource</code> and is polled in a system. <code>game_loop.rs</code> runs against <code>echo_server.rs</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>game_loop.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::{Connection, Error, NO_WAIT};
+use std::time::Duration;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut conn = Connection::connect("demo", Duration::from_secs(5))?;
+    let mut echoes = 0;
+    for frame in 0..60u32 {
+        conn.send(&amp;frame.to_le_bytes(), NO_WAIT)?; // Error::Timeout only if the ring is full
+        loop {
+            match conn.receive(NO_WAIT) {
+                Ok(_echo) =&gt; echoes += 1,
+                Err(Error::Timeout) =&gt; break, // nothing more this frame
+                Err(e) =&gt; return Err(e),      // Error::Disconnected: the peer is gone
+            }
+        }
+        std::thread::sleep(Duration::from_millis(16)); // the rest of the frame
+    }
+    println!("{echoes} echoes in 60 frames");
+    Ok(())
+}</code></pre></div>
+      <div class="code"><div class="label"><span>a reader thread and a channel</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">// Sending on this thread, receiving on another: the halves of the connection
+let (mut sender, mut receiver) = conn.into_split();
+let reader = std::thread::spawn(move || {
+    while let Ok(message) = receiver.receive(None) {
+        if tx.send(message).is_err() {
+            break; // the frame loop is gone
+        }
+    }
+});
+// Each frame: whatever has arrived, without waiting
+sender.send(b"update", None)?;</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="setup" aria-labelledby="h-setup">
+    <div class="plate-head"><h2 id="h-setup">Install and ship</h2><span class="eyebrow">Rust 1.85+ · x86-64-v3 · ARM64 Linux · Apple Silicon</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>fipc-sys</code> links the library dynamically (on Windows through <code>raw-dylib</code>: no import library) and copies it into Cargo's build folder, where <code>cargo run</code> and <code>cargo test</code> find it. It takes the library from the folder <code>FASTIPC_LIB_DIR</code> names, else its own copy. On docs.rs nothing links.</p>
+        <p>A program started on its own needs the library beside it: on Windows, <code>fastipc.dll</code> next to the <code>.exe</code>; on Linux, <code>libfastipc.so</code> next to the executable, linked with an rpath of <code>$ORIGIN</code>; on macOS, <code>libfastipc.dylib</code> next to the executable, linked with an rpath of <code>@loader_path</code>. After a build the file is in <code>target/&lt;profile&gt;/build/fipc-sys-*/out/</code>; a build script of a crate that depends on <code>fipc-sys</code> gets that folder as <code>DEP_FASTIPC_LIB_DIR</code>.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>Cargo.toml</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-toml">[dependencies]
+fipc = "1.0"</code></pre></div>
+        <div class="code"><div class="label"><span>.cargo/config.toml (Linux, macOS: ship it next to the binary)</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-toml">[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-Wl,-rpath,$ORIGIN"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-Wl,-rpath,$ORIGIN"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,@loader_path"]</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow"><a href="https://docs.rs/fipc">docs.rs/fipc</a></span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>Listener::listen(name, capacity)</code></td><td>Claims the name and listens; <code>AddrInUse</code> if another listener holds it.</td></tr>
+          <tr><td><code>listener.accept(timeout)</code></td><td>Sets the next client's connection up on the calling thread and returns its <code>Connection</code>. One client at a time: drop it before the next accept. <code>NO_WAIT</code> polls.</td></tr>
+          <tr><td><code>listener.cancel()</code> · <code>canceler()</code></td><td>Cancel waiting accepts · a <code>Canceler</code> that does it from any thread. Dropping the listener stops listening; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>Connection::connect(name, timeout)</code></td><td>Connects to the server listening on the name, waiting for it to listen and accept: client and server run on different threads or processes.</td></tr>
+          <tr><td><code>send(&amp;[u8], timeout)</code></td><td>Sends one message of any size.</td></tr>
+          <tr><td><code>receive(timeout)</code></td><td>Receives one message of any size as a new <code>Vec&lt;u8&gt;</code>.</td></tr>
+          <tr><td><code>receive_into(&amp;mut [u8], timeout)</code></td><td>Receives into your buffer and returns the length; <code>TooLarge { len }</code> if it doesn't fit.</td></tr>
+          <tr><td><code>send_acquire(len, timeout)</code> · <code>slot.commit(len)</code></td><td>Zero-copy send.</td></tr>
+          <tr><td><code>receive_acquire(timeout)</code> · drop the slot</td><td>Zero-copy receive.</td></tr>
+          <tr><td><code>rpc_submit(opcode, payload, timeout)</code></td><td>Sends a request; returns its id.</td></tr>
+          <tr><td><code>rpc_respond(id, opcode, status, payload, timeout)</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>rpc_receive(timeout)</code> · <code>rpc_receive_into(&amp;mut [u8], timeout)</code></td><td>Receives one request or response: an <code>RpcMessage</code> · an <code>RpcHeader</code>, the payload in your buffer.</td></tr>
+          <tr><td><code>split()</code> · <code>into_split()</code></td><td>The <code>Sender</code> and <code>Receiver</code> halves, borrowed · owned, for two threads.</td></tr>
+          <tr><td><code>max_piece()</code> · <code>cancel()</code> · <code>canceler()</code></td><td>The zero-copy limit · cancel waiting calls · a <code>Canceler</code> for any thread. Dropping the connection ends it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding, copied 16-byte messages run at 46 to 58 million per second between two processes, and 64 KiB messages at 450,000 to 470,000 per second (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

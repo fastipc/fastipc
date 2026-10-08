@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for C: shared-memory IPC API (fipc.h)</title>
+<meta name="description" content="Shared-memory IPC in C: FastIPC&#x27;s C API, include/fipc.h, 18 functions for messages and RPC between two processes on Linux, Windows and macOS.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/c.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for C: shared-memory IPC API (fipc.h)">
+<meta property="og:description" content="Shared-memory IPC in C: FastIPC&#x27;s C API, include/fipc.h, 18 functions for messages and RPC between two processes on Linux, Windows and macOS.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/c.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for C: shared-memory IPC API (fipc.h)">
+<meta name="twitter:description" content="Shared-memory IPC in C: FastIPC&#x27;s C API, include/fipc.h, 18 functions for messages and RPC between two processes on Linux, Windows and macOS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html" aria-current="page">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">include/fipc.h · fastipc.dll / libfastipc.so / libfastipc.dylib</span>
+    <h1>C</h1>
+    <p class="lede">The whole API is one header: 18 functions, one struct and eight result codes, with the C calling convention. Every binding is a thin layer over these calls.</p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#build">Build</a><a href="#hello">Server and client</a><a href="#rules">The rules</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#api">All 18 functions</a><a href="#results">Results</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="build" aria-labelledby="h-build">
+    <div class="plate-head"><h2 id="h-build">Build and link</h2><span class="eyebrow">the Zig build system · no CMake</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>The recommended way to build C (and <a href="cpp.html">C++</a>) against FastIPC is the Zig build system: no CMake or other build tool, and Zig 0.17.0 is a single download (a program written in Zig imports the <a href="zig.html">Zig module</a> instead). It builds the library for your target and compiles your C with its bundled Clang. After <code>zig fetch --save git+https://github.com/fastipc/fastipc</code>, your <code>build.zig</code> links the dependency's artifact <code>fastipc</code>, the shared library, which also puts <code>fipc.h</code> and <code>fipc.hpp</code> on the include path. The repository's <a href="https://github.com/fastipc/fastipc/tree/main/examples/c-cpp"><code>examples/c-cpp</code></a> is such a project, with the servers and clients of this page and the C++ page.</p>
+        <p>Any other compiler works too. Take the headers and the library from the <a href="https://github.com/fastipc/fastipc/releases/latest">GitHub release</a>: an archive per OS with <code>include/</code>, and <code>lib/libfastipc.so</code> (Linux x64 or arm64), <code>lib/libfastipc.dylib</code> (macOS 14.4+ on Apple Silicon) or <code>bin/fastipc.dll</code> with its import library <code>lib/fastipc.lib</code> (Windows x64). Or build them in a checkout with <code>zig build -Doptimize=ReleaseFast</code>: <code>zig-out/include</code>, <code>zig-out/lib</code> and, on Windows, <code>zig-out/bin</code>. On Linux, the program finds <code>libfastipc.so</code> through an rpath, <code>LD_LIBRARY_PATH</code> or a system library directory. On macOS, the dylib's install name is <code>@rpath/libfastipc.dylib</code>, so link the program with an rpath to its folder; the dylib is ad hoc signed, not notarized, so after a browser download clear the archive's quarantine flag with <code>xattr -d com.apple.quarantine lib/libfastipc.dylib</code> (an app with the hardened runtime and library validation signs the dylib it embeds with its own identity). On Windows, define <code>FASTIPC_SHARED</code> so the header declares the functions <code>dllimport</code>, and put <code>fastipc.dll</code> next to the program or on <code>PATH</code>. Every build targets x86-64-v3 (on macOS, Apple M1 and macOS 14.4).</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>build.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const fastipc = b.dependency("fipc", .{
+    .target = target,
+    .optimize = optimize,
+}).artifact("fastipc");
+exe.root_module.addCSourceFile(.{
+    .file = b.path("src/server.c"),
+    .flags = &amp;.{"-std=c11"},
+});
+exe.root_module.addCMacro("FASTIPC_SHARED", "1"); // Windows
+exe.root_module.linkLibrary(fastipc);
+b.installArtifact(fastipc); // the library next to the programs</code></pre></div>
+        <div class="code"><div class="label"><span>shell: other compilers</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash"># Linux, from the release archive
+cc server.c -Iinclude -Llib -lfastipc -o server
+LD_LIBRARY_PATH=lib ./server   # then ./client in another terminal
+
+# macOS, from the release archive
+xattr -d com.apple.quarantine lib/libfastipc.dylib   # if a browser downloaded it
+cc server.c -Iinclude -Llib -lfastipc -Wl,-rpath,@executable_path/lib -o server
+./server
+
+# Windows, MSVC (a developer prompt)
+cl /DFASTIPC_SHARED /Iinclude server.c lib\fastipc.lib
+copy bin\fastipc.dll .</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Run the server in one process, then the client in another; <code>fipc_connect</code> waits up to its timeout for a server to listen and accept. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client (<a href="index.html#interop">every pair of languages is tested</a>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.c</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">#include &lt;ctype.h&gt;
+#include &lt;fipc.h&gt;
+
+int main(void)
+{
+    fipc_listener_t* listener;
+    if (fipc_listen("my_channel", 1 &lt;&lt; 20, &amp;listener) != FIPC_OK) /* rings of 1 MiB each way */
+        return 1;
+    fipc_conn_t* conn;
+    if (fipc_accept(listener, &amp;conn, FIPC_FOREVER) == FIPC_OK) /* waits for a client */
+    {
+        char buf[256];
+        fipc_rpc_msg_t request;
+        if (fipc_rpc_recv(conn, buf, sizeof buf, &amp;request, FIPC_FOREVER) == FIPC_OK)
+        {
+            for (size_t i = 0; i &lt; request.len; i++)
+                buf[i] = (char) toupper((unsigned char) buf[i]);
+            fipc_rpc_respond(conn, request.id, request.opcode, 0, buf, request.len, FIPC_FOREVER);
+        }
+        fipc_close(conn);
+    }
+    fipc_listener_close(listener);
+    return 0;
+}</code></pre></div>
+      <div class="code"><div class="label"><span>client.c</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">#include &lt;fipc.h&gt;
+#include &lt;stdio.h&gt;
+
+int main(void)
+{
+    fipc_conn_t* conn;
+    fipc_result_t result = fipc_connect("my_channel", &amp;conn, 5000);
+    if (result != FIPC_OK)
+    {
+        fprintf(stderr, "connect: %s\n", fipc_result_str(result));
+        return 1;
+    }
+    uint64_t id;
+    char buf[256];
+    fipc_rpc_msg_t response;
+    if (fipc_rpc_submit(conn, 1, "ping", 4, &amp;id, FIPC_FOREVER) == FIPC_OK /* opcode 1 */
+        &amp;&amp; fipc_rpc_recv(conn, buf, sizeof buf, &amp;response, FIPC_FOREVER) == FIPC_OK)
+        printf("%.*s\n", (int) response.len, buf); /* PING */
+    fipc_close(conn);
+    return 0;
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rules" aria-labelledby="h-rules">
+    <div class="plate-head"><h2 id="h-rules">The rules</h2><span class="eyebrow">the header's conventions</span></div>
+    <div class="features">
+      <div class="feature"><span class="tag">timeout_ms</span><h3>Timeouts</h3><p>Always the last parameter, in milliseconds. <code>FIPC_NO_WAIT</code> (0) doesn't wait; <code>FIPC_FOREVER</code> (−1) waits for ever. A call that runs out returns <code>FIPC_TIMEOUT</code> having changed nothing.</p></div>
+      <div class="feature"><span class="tag">name · capacity</span><h3>Names and rings</h3><p>A name is 1 to 245 characters of <code>[A-Za-z0-9_.-]</code>, not starting with <code>.</code> or <code>-</code>, local to the user (Linux, macOS) or the desktop session (Windows). The server picks the ring size: a power of two from 1 KiB to 2 GiB.</p></div>
+      <div class="feature"><span class="tag">threads</span><h3>One sender, one receiver</h3><p>On a connection, one thread at a time sends and one receives, and the two may run at once. Cancels work from any thread. To stop a waiting thread: cancel, join it, then close.</p></div>
+      <div class="feature"><span class="tag">any size</span><h3>Messages</h3><p>A message holds at least one byte and arrives in order. The copying calls take any size; a long message travels in pieces and is delivered whole or not at all.</p></div>
+      <div class="feature"><span class="tag">FIPC_TOO_LARGE</span><h3>Buffers too small</h3><p>A receive into a buffer that is too small takes nothing and reports the length, so allocate that much and call again. Pass a zero-length buffer to ask for the length only.</p></div>
+      <div class="feature"><span class="tag">FIPC_DISCONNECTED</span><h3>The peer's end</h3><p>Final for that connection: sends return it at once, receives after every completed message. Close the connection, then accept or connect a new one.</p></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">messages of one piece: up to fipc_max_piece(conn) bytes</span></div>
+    <p class="intro">Reserve room in the ring, write the message there, publish it. On the other side, read it where it lies and release it. Pointers are 16-byte aligned. <code>fipc_max_piece</code> is the ring's capacity less 64 bytes; anything longer goes through <code>fipc_send</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">void* out;
+if (fipc_send_acquire(conn, 64, &amp;out,
+                      FIPC_FOREVER) == FIPC_OK) {
+    int n = snprintf(out, 64, "tick %d", tick);
+    fipc_send_commit(conn, (size_t) n); /* publish n bytes */
+}</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">const void* data;
+size_t len;
+if (fipc_recv_acquire(conn, &amp;data, &amp;len,
+                      FIPC_FOREVER) == FIPC_OK) {
+    handle(data, len);       /* read-only, in the ring */
+    fipc_recv_release(conn); /* frees its room */
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">fipc_rpc_msg_t, 32 bytes</span></div>
+    <p class="intro">An RPC message is a plain message with a 32-byte header in front: an id, a kind, your opcode, your status and the payload's length. A connection numbers its requests from 1, and either side may submit. Use a connection for RPC or for plain messages, not both.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>client: call</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">enum { OP_UPPER = 1 };
+
+uint64_t id;
+fipc_rpc_submit(conn, OP_UPPER, "ping", 4, &amp;id, FIPC_FOREVER);
+
+char out[256];
+fipc_rpc_msg_t reply;
+if (fipc_rpc_recv(conn, out, sizeof out, &amp;reply,
+                  FIPC_FOREVER) == FIPC_OK
+    &amp;&amp; reply.kind == FIPC_RPC_RESPONSE &amp;&amp; reply.id == id)
+    printf("%d: %.*s\n", reply.status, (int) reply.len, out);</code></pre></div>
+      <div class="code"><div class="label"><span>server: answer</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">char buf[4096];
+fipc_rpc_msg_t req;
+while (fipc_rpc_recv(conn, buf, sizeof buf, &amp;req,
+                     FIPC_FOREVER) == FIPC_OK) {
+    if (req.kind != FIPC_RPC_REQUEST)
+        continue;
+    for (size_t i = 0; i &lt; req.len; i++)
+        buf[i] = (char) toupper((unsigned char) buf[i]);
+    fipc_rpc_respond(conn, req.id, req.opcode, /*status*/ 0,
+                     buf, req.len, FIPC_FOREVER);
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="api" aria-labelledby="h-api">
+    <div class="plate-head"><h2 id="h-api">All 18 functions</h2><span class="eyebrow">the exports, exactly</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">Function</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>fipc_listen</code></td><td>Server: claims a name and listens on it with rings of a given capacity. Doesn't wait.</td></tr>
+          <tr><td><code>fipc_accept</code></td><td>Server: waits for a client, sets its connection up on the calling thread and returns it. One client at a time. A call that times out keeps a client's setup for the next, so timeout 0 polls.</td></tr>
+          <tr><td><code>fipc_listener_cancel</code></td><td>Makes every waiting and later accept return <code>FIPC_CANCELLED</code>, dropping a client whose setup began. Any thread.</td></tr>
+          <tr><td><code>fipc_listener_close</code></td><td>Stops listening and frees the listener; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>fipc_connect</code></td><td>Client: connects to the server listening on a name and sets the connection up on the calling thread, waiting for the server to listen and accept: client and server run on different threads or processes.</td></tr>
+          <tr><td><code>fipc_max_piece</code></td><td>The longest message the zero-copy calls take: the capacity less 64 bytes.</td></tr>
+          <tr><td><code>fipc_cancel</code></td><td>Makes every waiting and later call on the connection return <code>FIPC_CANCELLED</code>. Any thread.</td></tr>
+          <tr><td><code>fipc_close</code></td><td>Ends the connection (the peer gets <code>FIPC_DISCONNECTED</code>), unmaps its rings, frees the handle.</td></tr>
+          <tr class="sep"><td><code>fipc_send</code></td><td>Sends one message of any size, copying it in, in pieces if needed.</td></tr>
+          <tr><td><code>fipc_recv</code></td><td>Receives one message of any size into your buffer.</td></tr>
+          <tr><td><code>fipc_send_acquire</code></td><td>Zero-copy send, step 1: reserves contiguous room in the ring.</td></tr>
+          <tr><td><code>fipc_send_commit</code></td><td>Zero-copy send, step 2: publishes the reserved bytes as one message.</td></tr>
+          <tr><td><code>fipc_recv_acquire</code></td><td>Zero-copy receive, step 1: the next message, in place and read-only.</td></tr>
+          <tr><td><code>fipc_recv_release</code></td><td>Zero-copy receive, step 2: frees the message's room.</td></tr>
+          <tr class="sep"><td><code>fipc_rpc_submit</code></td><td>Sends a request and returns its id.</td></tr>
+          <tr><td><code>fipc_rpc_respond</code></td><td>Sends the response to a request id, with an opcode, a status and a payload.</td></tr>
+          <tr><td><code>fipc_rpc_recv</code></td><td>Receives one request or response: the header and its payload.</td></tr>
+          <tr class="sep"><td><code>fipc_result_str</code></td><td>Names a result code, such as <code>"FIPC_OK"</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="plate" id="results" aria-labelledby="h-res">
+    <div class="plate-head"><h2 id="h-res">Results</h2><span class="eyebrow">fipc_result_t</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col" class="n">Value</th><th scope="col">Code</th><th scope="col">Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="n">0</td><td><code>FIPC_OK</code></td><td>Done.</td></tr>
+          <tr><td class="n">1</td><td><code>FIPC_TIMEOUT</code></td><td>The timeout ran out; with timeout 0, there was nothing to do without waiting.</td></tr>
+          <tr><td class="n">2</td><td><code>FIPC_DISCONNECTED</code></td><td>The peer closed the connection or its process ended.</td></tr>
+          <tr><td class="n">3</td><td><code>FIPC_CANCELLED</code></td><td>A cancel was called, and the call would have had to wait.</td></tr>
+          <tr><td class="n">4</td><td><code>FIPC_TOO_LARGE</code></td><td>The message doesn't fit the buffer, or one piece for zero-copy. It stays queued; its length is reported.</td></tr>
+          <tr><td class="n">5</td><td><code>FIPC_INVALID</code></td><td>A bad argument or handle, a call out of order, a peer of another version or user, corrupt ring content.</td></tr>
+          <tr><td class="n">6</td><td><code>FIPC_NO_MEMORY</code></td><td>Memory or another OS resource ran out while setting a connection up.</td></tr>
+          <tr><td class="n">7</td><td><code>FIPC_ADDR_IN_USE</code></td><td><code>fipc_listen</code>: another listener holds the name.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/include/fipc.h">fipc.h</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

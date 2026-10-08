@@ -1,0 +1,64 @@
+{
+  "name": "fipc",
+  "version": "1.0.0",
+  "description": "Fast messages and RPC between two processes on one machine, through shared memory: Node.js, Bun and Deno",
+  "keywords": [
+    "ipc",
+    "shared-memory",
+    "rpc",
+    "interprocess",
+    "napi",
+    "node-api",
+    "bun",
+    "deno"
+  ],
+  "homepage": "https://fastipc.github.io/fastipc/js.html",
+  "bugs": "https://github.com/fastipc/fastipc/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fastipc/fastipc.git",
+    "directory": "bindings/js"
+  },
+  "license": "MIT",
+  "author": "Hayden Donnelly",
+  "type": "commonjs",
+  "main": "./index.cjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.ts",
+        "default": "./index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.cjs",
+    "index.mjs",
+    "index.d.ts",
+    "index.d.mts",
+    "prebuilds/",
+    "README.md",
+    "LICENSE"
+  ],
+  "os": [
+    "linux",
+    "win32",
+    "darwin"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --expose-gc --test"
+  }
+}

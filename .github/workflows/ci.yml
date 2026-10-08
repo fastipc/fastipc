@@ -1,0 +1,551 @@
+name: CI
+
+# Pull requests only, plus runs by hand: a merge commit was already tested as the pull request's merge ref.
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# A new push to a pull request's branch cancels that branch's superseded run. A run by hand gets a group
+# of its own and is never cancelled: a group also cancels a *pending* run when a newer one queues,
+# whatever cancel-in-progress says.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  build-and-test-linux:
+    name: Build, Test, and Benchmark (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEST_FAIL_ON_FAILURE: ON
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdb
+          sudo apt-get install -y clang-format-18
+          sudo ln -sf /usr/bin/clang-format-18 /usr/bin/clang-format
+
+      - name: Setup .NET for C# benchmarks
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Verify installations
+        run: |
+          zig version
+          dotnet --version
+          python --version
+
+      - name: Check system resources (Linux)
+        run: |
+          echo "=== CPU Info ==="
+          nproc
+          lscpu | grep -E "CPU\(s\)|Model name|Thread|Core"
+          echo "=== Memory Info ==="
+          free -h
+          echo "=== Disk Info ==="
+          df -h /
+
+      - name: Check frozen files (include/fipc.h)
+        run: python devtool.py check-frozen
+
+      - name: Build (C)
+        run: |
+          rm -rf zig-out zig-cache || true
+          python devtool.py build
+
+      - name: Check exports
+        run: python devtool.py check-exports --exact
+
+      - name: Test (Zig, fast tier)
+        # The Zig unit tests and the single-process C-API tests (tests/zig, tests/zig/README.md)
+        run: python devtool.py test fast
+
+      - name: Test (Zig, slow tier)
+        # The multi-process C-API tests (tests/zig)
+        run: python devtool.py test slow
+
+      - name: Benchmark (Zig suite, smoke run)
+        # Every case of bench/zig once, 20 ms each: the suite and the library still work together. The
+        # measured runs and the A/B are manual (docs/perf/baseline.md).
+        run: python devtool.py bench zig-all --quick
+
+      - name: Setup Go
+        # gofmt for the format check: the binding's toolchain (go.mod's go line), not whatever Go the image carries
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+
+      - name: Check code formatting (C + Zig + Go)
+        # clang-format-18 for C/H; zig fmt --check for build.zig, build.zig.zon, src/, tests/zig and bench/zig (devtool_lib/zig_format.py);
+        # gofmt -l for bindings/go and bench/go (devtool_lib/go_format.py)
+        run: python devtool.py format --check
+      - name: Build and Benchmark (Python - RPC)
+        run: |
+          python devtool.py bench python-rpc
+      - name: Build and Benchmark (C# - RPC)
+        run: |
+          python devtool.py bench csharp-rpc
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Test (Java)
+        # The Java binding's integration tests against this build, with a Python peer from the repository's venv
+        run: bindings/java/gradlew -p bindings/java test --no-daemon --console=plain
+
+  rust:
+    # Linux only: Windows runners cost twice the minutes, and the release workflow builds and smoke-tests the crates
+    # on Windows
+    name: Rust binding (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FIPC_REQUIRE_INTEROP: '1'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - name: Build (C) and the Python venv
+        # The tests link the repository's build; the cross-language tests run a Python peer from venv/
+        run: |
+          python devtool.py build
+          python devtool.py install python
+
+      - name: Format, lint and test
+        working-directory: bindings/rust
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: Package and smoke-test the crates
+        run: python devtool.py package rust --smoke
+
+  go:
+    # Linux only, as the Rust job: the release workflow builds and smoke-tests the Go module on Windows and macOS
+    name: Go binding (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FIPC_REQUIRE_INTEROP: '1'
+      GOTOOLCHAIN: local
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Setup Go
+        # The binding's toolchain: go.mod's go line (1.27, the newest 1.27.x)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+          cache-dependency-path: bindings/go/go.sum
+
+      - name: Build (C) and the Python venv
+        # The tests load the repository's build (zig-out); the cross-language tests run a Python peer from venv/
+        run: |
+          python devtool.py build
+          python devtool.py install python
+
+      - name: Format, vet and test
+        # Without cgo, as the binding is built; then again under the race detector, which needs cgo (the runner's gcc)
+        working-directory: bindings/go
+        run: |
+          unformatted=$(gofmt -l .)
+          if [[ -n "$unformatted" ]]; then
+            echo "::error::Not gofmt-formatted: $unformatted"
+            exit 1
+          fi
+          CGO_ENABLED=0 go vet ./...
+          CGO_ENABLED=0 go test ./...
+          CGO_ENABLED=1 go test -race ./...
+
+      - name: Package and smoke-test the Go module
+        run: python devtool.py package go --smoke
+
+
+  build-and-test-windows:
+    name: Build, Test, and Benchmark (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      TEST_FAIL_ON_FAILURE: ON
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Verify installations
+        run: |
+          zig version
+          dotnet --version
+          python --version
+
+      - name: Check system resources (Windows)
+        run: |
+          echo "=== CPU Info ==="
+          Get-WmiObject Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
+          echo "=== Memory Info ==="
+          Get-WmiObject Win32_ComputerSystem | Select-Object TotalPhysicalMemory
+          echo "=== Disk Info ==="
+          Get-PSDrive C | Select-Object Used, Free
+
+      - name: Setup LLVM (clang-format)
+        run: |
+          # LLVM is already installed on windows-latest, just ensure it's in PATH
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Create a clang-format-18 alias/copy for compatibility (CI uses newer clang, but we want consistent naming)
+          copy "C:\Program Files\LLVM\bin\clang-format.exe" "C:\Program Files\LLVM\bin\clang-format-18.exe"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Cache Zig build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .zig-cache
+          key: zig-build-windows-0.17.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-build-windows-0.17.0-
+
+      - name: Build (C)
+        run: |
+          if (Test-Path zig-out) { Remove-Item -Recurse -Force zig-out }
+          python devtool.py build
+
+      - name: Check exports
+        run: python devtool.py check-exports --exact
+
+      - name: Test (Zig, fast tier)
+        # The Zig unit tests and the single-process C-API tests (tests/zig, tests/zig/README.md)
+        run: python devtool.py test fast
+
+      - name: Benchmark (Zig suite, smoke run)
+        # Every case of bench/zig once, 20 ms each: the suite and the library still work together. The
+        # measured runs and the A/B are manual (docs/perf/baseline.md).
+        run: python devtool.py bench zig-all --quick
+
+  build-and-test-macos:
+    # The public repository only: macOS runners are free there, and bill ten times the minutes elsewhere
+    if: github.repository == 'fastipc/fastipc'
+    name: Build, Test, and Benchmark (macOS)
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      TEST_FAIL_ON_FAILURE: ON
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - name: Verify installations
+        run: |
+          zig version
+          dotnet --version
+          python --version
+
+      - name: Check system resources (macOS)
+        run: |
+          echo "=== CPU Info ==="
+          sysctl -n machdep.cpu.brand_string hw.ncpu hw.cachelinesize
+          echo "=== Memory Info ==="
+          sysctl -n hw.memsize
+          echo "=== Disk Info ==="
+          df -h /
+
+      - name: Check frozen files (include/fipc.h)
+        run: python devtool.py check-frozen
+
+      - name: Build (C)
+        run: |
+          rm -rf zig-out zig-cache || true
+          python devtool.py build
+
+      - name: Check exports
+        # The 18 functions, and the two symbols Zig's Mach-O linker adds to every dylib (devtool_lib/exports.py)
+        run: python devtool.py check-exports --exact
+
+      - name: Test (Zig, fast tier)
+        # The Zig unit tests and the single-process C-API tests (tests/zig, tests/zig/README.md)
+        run: python devtool.py test fast
+
+      - name: Test (Zig, slow tier)
+        # The multi-process C-API tests (tests/zig)
+        run: python devtool.py test slow
+
+      - name: Benchmark (Zig suite, smoke run)
+        # Every case of bench/zig once, 20 ms each: the suite and the library still work together. The
+        # measured runs and the A/B are manual (docs/perf/baseline.md).
+        run: python devtool.py bench zig-all --quick
+
+      - name: The Python binding in the venv
+        # The Java and Rust tests' cross-language peer
+        run: python devtool.py install python
+
+      - name: Test (C#)
+        # The C# integration tests; the build copies the library next to the test assembly
+        run: dotnet test tests/csharp/Fipc.IntegrationTests -c Release
+
+      - name: Test (Java)
+        # The Java binding's integration tests against this build, with a Python peer from the repository's venv
+        run: bindings/java/gradlew -p bindings/java test --no-daemon --console=plain
+
+      - name: Test (Rust)
+        env:
+          FIPC_REQUIRE_INTEROP: '1'
+        working-directory: bindings/rust
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: Package and smoke-test the crates
+        run: python devtool.py package rust --smoke
+
+  thread-sanitizer-macos:
+    # The public repository only, as build-and-test-macos
+    if: github.repository == 'fastipc/fastipc'
+    name: Thread Sanitizer (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Test (Zig, both tiers) under TSan
+        # As on Linux (thread-sanitizer-linux), without the mmap randomness setting, which macOS doesn't need.
+        # build.zig adds atexit_sleep_ms=0 to TSAN_OPTIONS for the test runs on macOS: TSan's exit delay there
+        # would hold a crashed peer's end past the tests' windows.
+        env:
+          TSAN_OPTIONS: allocator_may_return_null=1
+        run: |
+          zig build test -Denable_tsan=true --summary all --test-timeout 60s
+          zig build test-slow -Denable_tsan=true --summary all --test-timeout 330s
+
+  build-and-test-linux-arm64:
+    # The public repository only, as build-and-test-macos: GitHub's ARM64 Linux runners are free for public
+    # repositories only
+    if: github.repository == 'fastipc/fastipc'
+    name: Build, Test, and Benchmark (Linux ARM64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    env:
+      TEST_FAIL_ON_FAILURE: ON
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Setup Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdb
+
+      - name: Verify installations
+        run: |
+          zig version
+          dotnet --version
+          python --version
+
+      - name: Check system resources (Linux ARM64)
+        run: |
+          echo "=== CPU Info ==="
+          nproc
+          lscpu | grep -E "Architecture|CPU\(s\)|Model name|Thread|Core"
+          echo "=== Memory Info ==="
+          free -h
+          echo "=== Disk Info ==="
+          df -h /
+
+      - name: Check frozen files (include/fipc.h)
+        run: python devtool.py check-frozen
+
+      - name: Build (C)
+        run: |
+          rm -rf zig-out zig-cache || true
+          python devtool.py build
+
+      - name: Check exports
+        run: python devtool.py check-exports --exact
+
+      - name: Test (Zig, fast tier)
+        # The Zig unit tests and the single-process C-API tests (tests/zig, tests/zig/README.md)
+        run: python devtool.py test fast
+
+      - name: Test (Zig, slow tier)
+        # The multi-process C-API tests (tests/zig)
+        run: python devtool.py test slow
+
+      - name: Test (Zig, fast tier) under TSan
+        # TSan on aarch64 Linux; the slow tier under TSan runs on x86-64 (thread-sanitizer-linux)
+        run: zig build test -Denable_tsan=true --summary all --test-timeout 60s
+
+      - name: Benchmark (Zig suite, smoke run)
+        # Every case of bench/zig once, 20 ms each: the suite and the library still work together. The
+        # measured runs and the A/B are manual (docs/perf/baseline.md).
+        run: python devtool.py bench zig-all --quick
+
+      - name: The Python binding in the venv
+        # The Java and Rust tests' cross-language peer
+        run: python devtool.py install python
+
+      - name: Test (C#)
+        # The C# integration tests against this build
+        run: LD_LIBRARY_PATH=$PWD/zig-out/lib dotnet test tests/csharp/Fipc.IntegrationTests -c Release
+
+      - name: Test (Java)
+        # The Java binding's integration tests against this build, with a Python peer from the repository's venv
+        run: bindings/java/gradlew -p bindings/java test --no-daemon --console=plain
+
+      - name: Test (Rust)
+        env:
+          FIPC_REQUIRE_INTEROP: '1'
+        working-directory: bindings/rust
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: Package and smoke-test the crates
+        run: python devtool.py package rust --smoke
+
+  thread-sanitizer-linux:
+    name: Thread Sanitizer (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          use-cache: false
+
+      - name: Test (Zig, both tiers) under TSan
+        # -Denable_tsan sets sanitize_thread on every module and compiles the Zig code with LLVM
+        # (the self-hosted backend ignores it), so the Zig tests, the test peer and the library are
+        # all instrumented. A report makes the test process exit with 66, which fails its tier.
+        # Runners use 32 bits of mmap randomness, which older TSan runtimes can't map around; 28 is
+        # the usual setting. A unit test checks that an impossible allocation fails, which TSan's
+        # allocator only returns instead of aborting with allocator_may_return_null. The timeouts
+        # are the devtool tiers'.
+        env:
+          TSAN_OPTIONS: allocator_may_return_null=1
+        run: |
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          zig build test -Denable_tsan=true --summary all --test-timeout 60s
+          zig build test-slow -Denable_tsan=true --summary all --test-timeout 330s

@@ -1,0 +1,14 @@
+[package]
+name = "fipc-bench"
+description = "FastIPC's Rust benchmark, through the binding (fipc)"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[dependencies]
+fipc = { path = "../../bindings/rust/fipc" }
+
+[profile.release]
+codegen-units = 1

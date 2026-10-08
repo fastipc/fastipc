@@ -1,0 +1,22 @@
+{
+  "windows_host": {
+    "sandbox_path": "/mnt/c/WSL2WindowsHostSandbox/fastipc",
+    "python_exe": "/mnt/c/Python313/python.exe",
+    "dotnet_exe": "/mnt/c/Program Files/dotnet/dotnet.exe"
+  },
+  "sync_patterns": {
+    "include": [
+      "src/**/*.py",
+      "src/**/*.cs",
+      "src/**/*.csproj",
+      "src/**/requirements.txt",
+      "src/**/requirements-tests.txt"
+    ],
+    "exclude": [
+      "**/__pycache__",
+      "**/bin",
+      "**/obj",
+      "**/venv"
+    ]
+  }
+}

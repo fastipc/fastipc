@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for Java: shared-memory IPC over the FFM API</title>
+<meta name="description" content="Shared-memory IPC in Java 22+: io.github.fastipc:fipc, Listener and Connection over the FFM API for messages and RPC between two processes.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/java.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for Java: shared-memory IPC over the FFM API">
+<meta property="og:description" content="Shared-memory IPC in Java 22+: io.github.fastipc:fipc, Listener and Connection over the FFM API for messages and RPC between two processes.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/java.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for Java: shared-memory IPC over the FFM API">
+<meta name="twitter:description" content="Shared-memory IPC in Java 22+: io.github.fastipc:fipc, Listener and Connection over the FFM API for messages and RPC between two processes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html" aria-current="page">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">io.github.fastipc:fipc on Maven Central · module io.github.fastipc</span>
+    <h1>Java</h1>
+    <p class="lede">Two classes, <code>Listener</code> and <code>Connection</code>, over the C API through the FFM API (<code>java.lang.foreign</code>), for Java 22 and later: no JNI, no dependencies. A call that doesn't succeed throws <code>FipcException</code>. Both classes are <code>AutoCloseable</code> and safe to close from any thread. The jar carries the native library for Windows x64, Linux x64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon.</p>
+    <div class="install" style="max-width:620px"><span class="lang">Gradle</span><code class="coords">implementation("io.github.fastipc:fipc:1.0.0")</code><button class="copy" type="button" data-copy='implementation("io.github.fastipc:fipc:1.0.0")'>copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Plain messages</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#interop">Any language</a><a href="#threads">Threads and close</a><a href="#setup">Native access</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals: <code>Connection.connect</code> waits up to its timeout for a server to listen and accept. With the jar on the class path, the source launcher runs each file as it is: <code>java --enable-native-access=ALL-UNNAMED -cp fipc-1.0.0.jar Server.java</code>. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>Server.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.Connection;
+import io.github.fastipc.Listener;
+import io.github.fastipc.RpcMessage;
+
+public class Server {
+    public static void main(String[] args) {
+        // rings of 1 MiB each way; accept() waits for a client
+        try (Listener listener =
+                 Listener.listen("my_channel", 1 &lt;&lt; 20);
+             Connection conn = listener.accept()) {
+            RpcMessage request = conn.rpcReceive();
+            String text = new String(request.payload());
+            conn.rpcRespond(request.id(), request.opcode(), 0,
+                            text.toUpperCase().getBytes());
+        }
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>Client.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.Connection;
+import java.time.Duration;
+
+public class Client {
+    public static void main(String[] args) {
+        try (Connection conn = Connection.connect("my_channel",
+                 Duration.ofSeconds(5))) {
+            conn.rpcSubmit(1, "ping".getBytes());  // opcode 1
+            byte[] reply = conn.rpcReceive().payload();
+            System.out.println(new String(reply));  // PING
+        }
+    }
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>send</code> takes a message of any size, and <code>receive</code> returns each one whole in a new array (or fills your buffer). This server echoes every message back until its client leaves, which ends its next <code>receive</code> with <code>DISCONNECTED</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>EchoServer.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.*;
+
+public class EchoServer {
+    public static void main(String[] args) {
+        // rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+        try (Listener listener = Listener.listen("demo", 1 &lt;&lt; 20);
+             Connection conn = listener.accept()) {
+            while (true) {
+                conn.send(conn.receive());   // echo, any size
+            }
+        } catch (FipcException e) {
+            if (e.result() != Result.DISCONNECTED) throw e;
+            System.out.println("client gone");
+        }
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>EchoClient.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.Connection;
+import java.time.Duration;
+
+public class EchoClient {
+    public static void main(String[] args) {
+        try (Connection conn =
+                 Connection.connect("demo", Duration.ofSeconds(5))) {
+            for (String word : new String[] {"hello", "shared", "memory"}) {
+                conn.send(word.getBytes());
+                System.out.println(new String(conn.receive()));
+            }
+        }
+    }
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">FipcException.result() is a Result</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>Every call that can wait has an overload without a timeout, which waits for ever, and one that takes a <code>java.time.Duration</code>: <code>Fipc.NO_WAIT</code> (<code>Duration.ZERO</code>) doesn't wait, <code>Fipc.FOREVER</code> waits for ever. A call that doesn't succeed throws <code>FipcException</code>, unchecked, whose <code>result()</code> says why: <code>TIMEOUT</code>, <code>DISCONNECTED</code>, <code>CANCELLED</code>, <code>TOO_LARGE</code>, <code>INVALID</code>, <code>NO_MEMORY</code> or <code>ADDR_IN_USE</code>.</p>
+        <p><code>DISCONNECTED</code> is final for that connection: close it, then accept or connect a new one. A call on a closed listener or connection throws <code>IllegalStateException</code>.</p>
+      </div>
+      <div class="code"><div class="label"><span>poll without blocking</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">byte[] msg;
+try {
+    msg = conn.receive(Duration.ofMillis(100));
+} catch (FipcException e) {
+    if (e.result() != Result.TIMEOUT) throw e;
+    msg = null;                    // nothing yet
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.maxPiece() bytes</span></div>
+    <p class="intro">Write into a <code>MemorySegment</code> of the ring and commit; read a read-only <code>MemorySegment</code> of the ring and release it. A segment is valid until its commit or release and confined to the thread that acquired it: touching it afterwards, or from another thread, throws instead of reaching memory that is no longer yours.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">MemorySegment room = conn.sendAcquire(5);   // in the ring
+room.copyFrom(MemorySegment.ofArray("hello".getBytes()));
+conn.sendCommit(5);</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">MemorySegment message = conn.receiveAcquire();  // read-only, in the ring
+handle(message);
+conn.receiveRelease();                          // frees its room</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">RpcMessage(id, kind, opcode, status, payload)</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status. Either side may submit. <code>rpcReceive()</code> returns each payload in a new array; <code>rpcReceive(buffer)</code> fills yours and returns an <code>RpcHeader</code>, with no allocation per message. Use a connection for RPC or for plain messages, not both. This server answers requests until its client leaves, and this client checks what came back; either makes the exchange above with the other half in any language.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>RpcServer.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.*;
+
+public class RpcServer {
+    static final int UPPER = 1;
+
+    public static void main(String[] args) {
+        try (Listener listener = Listener.listen("my_channel", 1 &lt;&lt; 20);
+             Connection conn = listener.accept()) {
+            while (true) {
+                RpcMessage req = conn.rpcReceive();
+                if (req.isRequest() &amp;&amp; req.opcode() == UPPER) {
+                    byte[] upper = new String(req.payload())
+                        .toUpperCase().getBytes();
+                    conn.rpcRespond(req.id(), req.opcode(), 0, upper);
+                }
+            }
+        } catch (FipcException e) {
+            if (e.result() != Result.DISCONNECTED) throw e;
+        }
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>RpcClient.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.*;
+import java.time.Duration;
+
+public class RpcClient {
+    static final int UPPER = 1;
+
+    public static void main(String[] args) {
+        try (Connection conn =
+                 Connection.connect("my_channel", Duration.ofSeconds(5))) {
+            long id = conn.rpcSubmit(UPPER, "ping".getBytes());
+            RpcMessage reply = conn.rpcReceive();
+            assert reply.isResponse() &amp;&amp; reply.id() == id;
+            System.out.println(reply.status() + " "
+                + new String(reply.payload()));   // 0 PING
+        }
+    }
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol</span></div>
+    <p class="intro">The <code>Server</code> and <code>Client</code> above work with a peer in any of the ten languages: <a href="index.html#interop">every pair of languages is tested</a>.</p>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads and close</h2><span class="eyebrow">close, then join</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>On a connection, one thread at a time sends and one thread at a time receives, and the two may run at once. <code>cancel()</code> and <code>close()</code> may be called from any thread, at any time. <code>close()</code> cancels the connection, so a waiting call throws <code>CANCELLED</code>, and the native close runs once the calls in progress have returned: no call ever runs on a closed connection.</p>
+        <p>Waits are not interruptible: <code>Thread.interrupt()</code> doesn't wake a call; <code>cancel()</code> and <code>close()</code> do. A waiting call blocks its thread in native code, which pins a virtual thread, so use platform threads for calls that wait long. A listener or connection that is never closed is closed by a <code>Cleaner</code> once it is unreachable.</p>
+      </div>
+      <div class="code"><div class="label"><span>stop a reader thread</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">Thread reader = Thread.ofPlatform().start(() -&gt; {
+    try {
+        while (true) {
+            handle(new String(conn.receive()));
+        }
+    } catch (FipcException e) {
+        // CANCELLED (closed) or DISCONNECTED
+    }
+});
+...
+conn.close();       // wakes the reader: CANCELLED
+reader.join();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="setup" aria-labelledby="h-setup">
+    <div class="plate-head"><h2 id="h-setup">Install and native access</h2><span class="eyebrow">Java 22+ · FFM API</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>The binding calls restricted methods of the FFM API, so grant it native access, or the JVM prints a warning on the first call: <code>--enable-native-access=ALL-UNNAMED</code> with the jar on the class path, <code>--enable-native-access=io.github.fastipc</code> on the module path, or <code>Enable-Native-Access: ALL-UNNAMED</code> in an executable jar's manifest.</p>
+        <p>The jar's native library is extracted once per content into the user's cache (<code>%LOCALAPPDATA%\fipc</code>, <code>~/.cache/fipc</code>, on macOS <code>~/Library/Caches/fipc</code>) and checked before each load. The system property <code>fastipc.library.path</code> names another one; <code>Fipc.libraryPath()</code> says which was loaded.</p>
+      </div>
+      <div class="code"><div class="label"><span>build.gradle.kts</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-kotlin">plugins {
+    application
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("io.github.fastipc:fipc:1.0.0")
+}
+
+application {
+    mainClass = "Server"
+    applicationDefaultJvmArgs =
+        listOf("--enable-native-access=ALL-UNNAMED")
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow">io.github.fastipc</span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>Listener.listen(name, capacity)</code></td><td>Claims the name and listens; <code>ADDR_IN_USE</code> if another listener holds it.</td></tr>
+          <tr><td><code>listener.accept([timeout])</code></td><td>Sets the next client's connection up on the calling thread and returns its <code>Connection</code>. One client at a time: close it before the next accept. <code>Fipc.NO_WAIT</code> polls.</td></tr>
+          <tr><td><code>listener.cancel()</code> · <code>close()</code></td><td>Cancel waiting accepts · stop listening (any thread); accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>Connection.connect(name, [timeout])</code></td><td>Connects to the server listening on the name, waiting for it to listen and accept: client and server run on different threads or processes.</td></tr>
+          <tr><td><code>send(message, [timeout])</code></td><td>Sends one message of any size: a <code>byte[]</code> (or a range of one), a <code>ByteBuffer</code> or a <code>MemorySegment</code>.</td></tr>
+          <tr><td><code>receive([timeout])</code></td><td>Receives one message of any size as a new <code>byte[]</code>.</td></tr>
+          <tr><td><code>receive(buffer, [timeout])</code></td><td>Receives into your <code>ByteBuffer</code> or <code>MemorySegment</code> and returns the length; <code>TOO_LARGE</code> if it doesn't fit.</td></tr>
+          <tr><td><code>sendAcquire(n)</code> · <code>sendCommit(n)</code></td><td>Zero-copy send.</td></tr>
+          <tr><td><code>receiveAcquire()</code> · <code>receiveRelease()</code></td><td>Zero-copy receive.</td></tr>
+          <tr><td><code>rpcSubmit(opcode, payload)</code></td><td>Sends a request; returns its id.</td></tr>
+          <tr><td><code>rpcRespond(id, opcode, status, payload)</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>rpcReceive()</code> · <code>rpcReceive(buffer)</code></td><td>Receives one request or response: an <code>RpcMessage</code> · an <code>RpcHeader</code>, the payload in your buffer.</td></tr>
+          <tr><td><code>maxPiece()</code> · <code>cancel()</code> · <code>close()</code></td><td>The zero-copy limit · cancel waiting calls · end the connection (any thread).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding, copied 16-byte messages run at about 16 million per second between two processes, after the JIT's warm-up (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for Go: shared-memory IPC without cgo (package fipc)</title>
+<meta name="description" content="Shared-memory IPC in Go: the package fipc, a Listener and a Conn for messages and RPC between two processes, safe from any goroutine, without cgo.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/go.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for Go: shared-memory IPC without cgo (package fipc)">
+<meta property="og:description" content="Shared-memory IPC in Go: the package fipc, a Listener and a Conn for messages and RPC between two processes, safe from any goroutine, without cgo.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/go.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for Go: shared-memory IPC without cgo (package fipc)">
+<meta name="twitter:description" content="Shared-memory IPC in Go: the package fipc, a Listener and a Conn for messages and RPC between two processes, safe from any goroutine, without cgo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html" aria-current="page">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">github.com/fastipc/fastipc/bindings/go · package fipc</span>
+    <h1>Go</h1>
+    <p class="lede">One package, <code>fipc</code>, for Go 1.27 and later: <code>fipc.Listen</code> and <code>fipc.Connect</code> give a <code>*Listener</code> and a <code>*Conn</code> with plain, zero-copy and RPC messages. Every method is safe from any goroutine, as with a <code>net.Conn</code>; failures are errors to test with <code>errors.Is</code>, and timeouts are <code>time.Duration</code>s. No cgo: the package loads the native library at run time through <a href="https://github.com/ebitengine/purego">purego</a>, so <code>CGO_ENABLED=0</code> builds and cross-compiling work and no C compiler is needed. The module carries the native library for Windows x64, Linux x64 and ARM64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon.</p>
+    <div class="install" style="max-width:720px"><span class="lang">go get</span><code>go get github.com/fastipc/fastipc/bindings/go/fipc@latest</code><button class="copy" type="button" data-copy="go get github.com/fastipc/fastipc/bindings/go/fipc@latest">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Plain messages</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#interop">Any language</a><a href="#goroutines">Goroutines</a><a href="#games">Frame loops</a><a href="#setup">Install and ship</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals (<code>go run server.go</code>, <code>go run client.go</code>; in a checkout of the repository, <code>go run ./examples/server</code> and <code>go run ./examples/client</code> in <code>bindings/go</code>): <code>fipc.Connect</code> waits up to its timeout for a server to listen and accept; <code>fipc.Forever</code> waits as long as it takes. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"bytes"
+	"log"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	listener, err := fipc.Listen("my_channel", 1&lt;&lt;20) // rings of 1 MiB each way
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.Close()
+	conn, err := listener.Accept(fipc.Forever) // waits for a client
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	request, err := conn.RPCReceive(fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = conn.RPCRespond(request.ID, request.Opcode, 0, bytes.ToUpper(request.Payload), fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+}</code></pre></div>
+      <div class="code"><div class="label"><span>client.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	conn, err := fipc.Connect("my_channel", 5*time.Second) // waits up to 5 s for the server
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.RPCSubmit(1, []byte("ping"), fipc.Forever); err != nil { // opcode 1
+		log.Fatal(err)
+	}
+	reply, err := conn.RPCReceive(fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(reply.Payload)) // PING
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>Send</code> takes a <code>[]byte</code> of any size (at least 1 byte), and <code>Receive</code> returns each message whole, in a new slice; <code>ReceiveInto</code> fills a buffer of yours and returns the length, without allocating. A message longer than the ring travels in pieces and arrives whole. This server echoes every message back until its client leaves, which ends its next <code>Receive</code> with <code>fipc.ErrDisconnected</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"errors"
+	"fmt"
+	"log"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	// rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+	listener, err := fipc.Listen("demo", 1&lt;&lt;20)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.Close()
+	conn, err := listener.Accept(fipc.Forever) // waits for a client
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	for {
+		msg, err := conn.Receive(fipc.Forever)
+		if errors.Is(err, fipc.ErrDisconnected) {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		if err := conn.Send(msg, fipc.Forever); err != nil { // echo, any size
+			log.Fatal(err)
+		}
+	}
+	fmt.Println("client gone")
+}</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	conn, err := fipc.Connect("demo", 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	for _, word := range []string{"hello", "shared", "memory"} {
+		if err := conn.Send([]byte(word), fipc.Forever); err != nil {
+			log.Fatal(err)
+		}
+		echo, err := conn.Receive(fipc.Forever)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(string(echo))
+	}
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">*fipc.Error mirrors fipc_result_t</span></div>
+    <p class="intro">A call the library refuses returns one of <code>fipc.ErrTimeout</code>, <code>ErrDisconnected</code>, <code>ErrCancelled</code>, <code>ErrTooLarge</code>, <code>ErrInvalid</code>, <code>ErrNoMemory</code> or <code>ErrAddrInUse</code>, the C API's results, as <code>*fipc.Error</code> values: test them with <code>errors.Is</code>. Their messages are the C names (<code>FIPC_TIMEOUT: the timeout ran out</code>), and <code>ErrTimeout</code>'s <code>Timeout()</code> is true, as for the deadlines of packages <code>os</code> and <code>net</code>. A call on a closed handle returns <code>fipc.ErrClosed</code>; one that can't load the library, an error that wraps <code>fipc.ErrNoLibrary</code> and says where it looked. The timeout comes last, a <code>time.Duration</code> counted in whole milliseconds, rounded up: <code>fipc.NoWait</code> (0) doesn't wait, <code>fipc.Forever</code> (or any negative duration) waits as long as it takes. <code>ErrDisconnected</code> is final: close the connection, then accept or connect a new one.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>wait at most 100 ms</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">msg, err := conn.Receive(100 * time.Millisecond)
+switch {
+case err == nil:
+	handle(msg)
+case errors.Is(err, fipc.ErrTimeout): // nothing yet
+default:
+	return err // fipc.ErrDisconnected: the peer is gone
+}</code></pre></div>
+      <div class="code"><div class="label"><span>a buffer of your own: ErrTooLarge says how much room</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">n, err := conn.ReceiveInto(buf, fipc.Forever)
+var e *fipc.Error
+if errors.As(err, &amp;e) &amp;&amp; e.Len() &gt; 0 { // ErrTooLarge: make room, then again
+	buf = make([]byte, e.Len())
+	n, err = conn.ReceiveInto(buf, fipc.Forever)
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.MaxPiece() bytes</span></div>
+    <p class="intro">Write a message into the ring and commit it; read one in the ring and release it. <code>SendAcquire(n)</code> returns a slice over room in the ring, valid until <code>SendCommit</code>, the next send or <code>Close</code>; <code>ReceiveAcquire</code> returns a read-only slice over the message, valid until <code>ReceiveRelease</code>, the next receive or <code>Close</code>. These slices point into shared memory: using one after that is undefined and may crash the program, so copy what must outlive it, and keep the connection reachable while you use one. A message of several pieces is <code>ErrTooLarge</code> for <code>ReceiveAcquire</code> and stays queued for <code>Receive</code>. In Go, zero-copy is slower than copying for short messages (<a href="#reference">below</a>): it takes two calls into the library per message on each side where a copy takes one, and through purego a call costs more than copying a short message. It pays off for long messages you would otherwise copy again.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">buf, err := conn.SendAcquire(5, fipc.Forever) // room in the ring
+if err != nil {
+	return err
+}
+copy(buf, "hello")
+return conn.SendCommit(5) // sent; buf is no longer valid</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">msg, err := conn.ReceiveAcquire(fipc.Forever) // the message in the ring, read-only
+if err != nil {
+	return err
+}
+handle(msg)           // read it in place
+conn.ReceiveRelease() // frees its room; msg is no longer valid</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">RPCMessage{ID, Kind, Opcode, Status, Payload}</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status (an <code>int32</code>). Either side may submit. <code>RPCReceive</code> returns an <code>RPCMessage</code> with the payload in a new slice; <code>RPCReceiveInto(buf)</code> puts the payload in your buffer and returns an <code>RPCHeader</code> with its length, with no allocation per message. A payload may be empty (<code>nil</code>). Several requests may be in flight; correlate the responses by id. Use a connection for RPC or for plain messages, not both. This server answers requests until its client leaves, and this client checks what came back; either makes the exchange above with the other half in any language.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>rpc_server.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"bytes"
+	"errors"
+	"log"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+const upper = 1
+
+func main() {
+	listener, err := fipc.Listen("my_channel", 1&lt;&lt;20)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.Close()
+	conn, err := listener.Accept(fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	for {
+		req, err := conn.RPCReceive(fipc.Forever)
+		if errors.Is(err, fipc.ErrDisconnected) {
+			return
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		if req.Kind == fipc.RPCRequest &amp;&amp; req.Opcode == upper {
+			if err := conn.RPCRespond(req.ID, req.Opcode, 0, bytes.ToUpper(req.Payload), fipc.Forever); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+}</code></pre></div>
+      <div class="code"><div class="label"><span>rpc_client.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+const upper = 1
+
+func main() {
+	conn, err := fipc.Connect("my_channel", 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	id, err := conn.RPCSubmit(upper, []byte("ping"), fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	reply, err := conn.RPCReceive(fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if reply.Kind != fipc.RPCResponse || reply.ID != id {
+		log.Fatalf("not the response to request %d: %+v", id, reply)
+	}
+	fmt.Println(reply.Status, string(reply.Payload)) // 0 PING
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol</span></div>
+    <p class="intro">The <code>server.go</code> and <code>client.go</code> above work with a peer in any of the ten languages: <a href="index.html#interop">every pair of languages is tested</a>. A Go service can serve a Python or JavaScript front end, or a game's editor in C#, without a socket.</p>
+  </section>
+
+  <section class="plate" id="goroutines" aria-labelledby="h-gor">
+    <div class="plate-head"><h2 id="h-gor">Goroutines, cancel and close</h2><span class="eyebrow">net.Conn semantics · context.AfterFunc</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>Every method of a <code>Listener</code> or <code>Conn</code> is safe to call from any goroutine. Each direction of a connection has a mutex of its own: concurrent sends run one at a time, each message whole, and so do concurrent receives, while one goroutine sends and another receives at once. A client and its server in one process run on different goroutines, since <code>Connect</code> waits for the server's <code>Accept</code>. A call that waits holds its goroutine's thread in the library, as a cgo call does; the scheduler runs the other goroutines on other threads.</p>
+        <p>To stop a goroutine that waits, call <code>conn.Cancel()</code> (or <code>listener.Cancel()</code>) from another one: every call that waits, then or later, returns <code>fipc.ErrCancelled</code>. With a context, <code>context.AfterFunc(ctx, conn.Cancel)</code> cancels the connection when the context is done.</p>
+        <p><code>conn.Close()</code> ends the connection: the peer gets <code>ErrDisconnected</code> once it has received what this side sent. It may run while other goroutines are inside calls: it cancels the connection, waits for them to return, then closes; later calls, and a second <code>Close</code>, return <code>ErrClosed</code>. <code>listener.Close()</code> stops listening and leaves the connections it accepted open. A handle that becomes unreachable without <code>Close</code> is closed by the garbage collector, some time later. There is no heartbeat and no timeout: a paused or hung peer is not reported, a crashed or killed one as soon as its process has ended.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>stop a reader goroutine</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">done := make(chan struct{})
+go func() {
+	defer close(done)
+	// until fipc.ErrCancelled (or fipc.ErrDisconnected)
+	for {
+		msg, err := conn.Receive(fipc.Forever)
+		if err != nil {
+			return
+		}
+		handle(msg)
+	}
+}()
+// ...
+conn.Cancel() // wakes the reader: ErrCancelled
+&lt;-done        // then close the connection, or go on with calls that needn't wait</code></pre></div>
+        <div class="code"><div class="label"><span>cancel with a context</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">stop := context.AfterFunc(ctx, conn.Cancel) // cancels the connection when ctx is done
+defer stop()</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="games" aria-labelledby="h-games">
+    <div class="plate-head"><h2 id="h-games">Games and frame loops</h2><span class="eyebrow">never block a frame</span></div>
+    <p class="intro">Poll the connection once a frame with <code>fipc.NoWait</code>, or give the receiving to a goroutine that forwards each message through a channel the frame loop drains. In an Ebitengine game, poll in <code>Update</code>, which runs 60 times a second by default. <code>game_loop.go</code> runs against <code>echo_server.go</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>game_loop.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	conn, err := fipc.Connect("demo", 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	echoes := 0
+	buf := make([]byte, 64)
+	for frame := range uint32(60) {
+		update := binary.LittleEndian.AppendUint32(nil, frame)
+		if err := conn.Send(update, fipc.NoWait); err != nil { // ErrTimeout only if the ring is full
+			log.Fatal(err)
+		}
+		for {
+			_, err := conn.ReceiveInto(buf, fipc.NoWait)
+			if errors.Is(err, fipc.ErrTimeout) {
+				break // nothing more this frame
+			} else if err != nil {
+				log.Fatal(err) // ErrDisconnected: the peer is gone
+			}
+			echoes++
+		}
+		time.Sleep(16 * time.Millisecond) // the rest of the frame
+	}
+	fmt.Printf("%d echoes in 60 frames\n", echoes)
+}</code></pre></div>
+      <div class="code"><div class="label"><span>a reader goroutine and a channel</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">messages := make(chan []byte, 64)
+go func() {
+	defer close(messages)
+	for {
+		msg, err := conn.Receive(fipc.Forever)
+		if err != nil {
+			return // ErrDisconnected, or ErrCancelled once the game closes the connection
+		}
+		messages &lt;- msg
+	}
+}()
+// Each frame: whatever has arrived, without waiting
+for len(messages) &gt; 0 {
+	handle(&lt;-messages)
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="setup" aria-labelledby="h-setup">
+    <div class="plate-head"><h2 id="h-setup">Install and ship</h2><span class="eyebrow">Go 1.27+ · no cgo · x86-64-v3 · ARM64 Linux · Apple Silicon</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><b>No cgo.</b> The module's one dependency is <a href="https://github.com/ebitengine/purego">github.com/ebitengine/purego</a>, which loads a shared library and calls its C functions from pure Go on Linux, macOS and Windows. Through it the package works with <code>CGO_ENABLED=0</code>: no C compiler on your machine or your build server, cross-compiling as for any pure Go program, and builds as fast as Go's. A program built with cgo works too.</p>
+        <p><b>Finding the library.</b> The package loads <code>fastipc.dll</code>, <code>libfastipc.so</code> or <code>libfastipc.dylib</code> on the first <code>Listen</code> or <code>Connect</code>, looking in the folder <code>FASTIPC_LIB_DIR</code> names (when it is set, nowhere else); then next to the running executable; then in the copy the module carries, <code>fipc/native/&lt;platform&gt;/</code>, found from the package's source path, which serves <code>go run</code>, <code>go test</code> and programs built on your machine; then, in a checkout of the repository, its <code>zig-out</code> build; last, the system's search. <code>fipc.LibraryPath()</code> says which file it loaded; the library is never unloaded.</p>
+        <p><b>Shipping a program.</b> Put the library next to the executable: the package loads it by its path, so no rpath and no install step are needed. Take it from the module's copy or from the <a href="https://github.com/fastipc/fastipc/releases/latest">GitHub release</a>'s archives; or keep it elsewhere and set <code>FASTIPC_LIB_DIR</code>. A program built with <code>-trimpath</code>, or run on another machine, doesn't find the module's copy.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>add the module, build without cgo</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash">go get github.com/fastipc/fastipc/bindings/go/fipc@latest
+CGO_ENABLED=0 go build -o server .</code></pre></div>
+        <div class="code"><div class="label"><span>ship it next to its library (here: for Linux on ARM64)</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash">GOOS=linux GOARCH=arm64 go build -o dist/server .
+cp "$(go env GOMODCACHE)"/github.com/fastipc/fastipc/bindings/go@v1.0.0/fipc/native/linux-arm64/libfastipc.so dist/</code></pre></div>
+        <div class="code"><div class="label"><span>or point it at a folder</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash">FASTIPC_LIB_DIR=/opt/myapp/lib ./server</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow"><a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a></span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>fipc.Listen(name, capacity)</code></td><td>Claims the name and listens: a <code>*Listener</code>; <code>ErrAddrInUse</code> if another listener holds it.</td></tr>
+          <tr><td><code>listener.Accept(timeout)</code></td><td>Sets the next client's connection up on the calling goroutine and returns its <code>*Conn</code>. One client at a time: close it before the next accept. <code>NoWait</code> polls.</td></tr>
+          <tr><td><code>listener.Cancel()</code> · <code>Close()</code> · <code>Name()</code></td><td>Cancel waiting accepts · stop listening; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>fipc.Connect(name, timeout)</code></td><td>Connects to the server listening on the name, waiting for it to listen and accept: client and server run on different goroutines or processes.</td></tr>
+          <tr><td><code>conn.Send(msg, timeout)</code></td><td>Sends one message of any size.</td></tr>
+          <tr><td><code>conn.Receive(timeout)</code></td><td>Receives one message of any size, in a new slice.</td></tr>
+          <tr><td><code>conn.ReceiveInto(buf, timeout)</code></td><td>Receives into your buffer and returns the length; <code>ErrTooLarge</code> (its <code>Len()</code>, the room needed) if it doesn't fit.</td></tr>
+          <tr><td><code>conn.SendAcquire(n, timeout)</code> · <code>SendCommit(n)</code></td><td>Zero-copy send: a slice over room in the ring, then publish.</td></tr>
+          <tr><td><code>conn.ReceiveAcquire(timeout)</code> · <code>ReceiveRelease()</code></td><td>Zero-copy receive: a slice over the message in the ring, then free its room.</td></tr>
+          <tr><td><code>conn.RPCSubmit(opcode, payload, timeout)</code></td><td>Sends a request; returns its id.</td></tr>
+          <tr><td><code>conn.RPCRespond(id, opcode, status, payload, timeout)</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>conn.RPCReceive(timeout)</code> · <code>RPCReceiveInto(buf, timeout)</code></td><td>Receives one request or response: an <code>RPCMessage</code> · an <code>RPCHeader</code>, the payload in your buffer.</td></tr>
+          <tr><td><code>conn.MaxPiece()</code> · <code>Name()</code> · <code>Cancel()</code> · <code>Close()</code></td><td>The zero-copy limit · the name · cancel waiting calls · end the connection.</td></tr>
+          <tr class="sep"><td><code>NoWait</code> · <code>Forever</code> · <code>RPCRequest</code> · <code>RPCResponse</code></td><td>0 · -1 (any negative duration) · 1 · 2.</td></tr>
+          <tr><td><code>*Error</code> · <code>ErrTimeout</code> ... <code>ErrAddrInUse</code> · <code>ErrClosed</code> · <code>ErrNoLibrary</code></td><td>The C API's results (<code>Code()</code>, <code>Name()</code>, <code>Len()</code>; for <code>errors.Is</code>) · a closed handle · the library can't be loaded.</td></tr>
+          <tr><td><code>fipc.LibraryPath()</code></td><td>The path of the library loaded (it loads it if needed).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding (Go 1.27, purego), copied 16-byte messages run at about 11 million per second between two processes, RPC requests at 10 to 11 million, and 64 KiB messages at 440,000 to 470,000 per second; zero-copy runs slower at 16 B, 5.8 to 8.2 million per second, since it takes two calls per message on each side (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

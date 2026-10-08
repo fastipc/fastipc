@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for Lua: shared-memory IPC for LuaJIT (fipc)</title>
+<meta name="description" content="Shared-memory IPC in Lua: the LuaJIT rock fipc, one module over the FFI with listen and connect for messages and RPC, no compiler needed.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/lua.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for Lua: shared-memory IPC for LuaJIT (fipc)">
+<meta property="og:description" content="Shared-memory IPC in Lua: the LuaJIT rock fipc, one module over the FFI with listen and connect for messages and RPC, no compiler needed.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/lua.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for Lua: shared-memory IPC for LuaJIT (fipc)">
+<meta name="twitter:description" content="Shared-memory IPC in Lua: the LuaJIT rock fipc, one module over the FFI with listen and connect for messages and RPC, no compiler needed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html" aria-current="page">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">fipc on LuaRocks · require("fipc")</span>
+    <h1>Lua</h1>
+    <p class="lede">One module over LuaJIT's FFI, for LuaJIT 2.1 (also OpenResty's, Neovim's and LÖVE's): <code>fipc.listen</code> and <code>fipc.connect</code> give listeners and connections with plain, zero-copy and RPC messages. Nothing is compiled. A call that fails returns <code>nil</code> and the error's name, as Lua's <code>io</code> functions do, so <code>assert()</code> turns it into an error. The rock carries the native library for Windows x64, Linux x64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon.</p>
+    <div class="install" style="max-width:620px"><span class="lang">LuaRocks</span><code>luarocks install fipc</code><button class="copy" type="button" data-copy="luarocks install fipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Plain messages</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#interop">Any language</a><a href="#threads">Threads and coroutines</a><a href="#games">Frame loops</a><a href="#setup">Install and ship</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals (<code>luajit server.lua</code>, <code>luajit client.lua</code>): <code>fipc.connect</code> waits up to its timeout, in milliseconds, for a server to listen and accept; a call without a timeout waits as long as it takes. A Lua state has one thread, and <code>connect</code> waits for the server's <code>accept</code>: in Lua, a client and its server run in different processes. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local listener = assert(fipc.listen("my_channel", 1024 * 1024)) -- rings of 1 MiB each way
+local conn = assert(listener:accept()) -- waits for a client
+local request = assert(conn:rpc_recv())
+assert(conn:rpc_respond(request.id, request.opcode, 0, request.payload:upper()))
+conn:close()
+listener:close()</code></pre></div>
+      <div class="code"><div class="label"><span>client.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local conn = assert(fipc.connect("my_channel", 5000)) -- waits up to 5 s for the server
+assert(conn:rpc_submit(1, "ping")) -- opcode 1
+print(assert(conn:rpc_recv()).payload) -- PING
+conn:close()</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>send</code> takes a message of any size, a Lua string (or a cdata pointer and its length), and <code>recv</code> returns each one whole as a Lua string. This server echoes every message back until its client leaves, which ends its next <code>recv</code> with <code>"disconnected"</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+-- rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+local listener = assert(fipc.listen("demo", 1024 * 1024))
+local conn = assert(listener:accept()) -- waits for a client
+while true do
+    local message, err = conn:recv()
+    if message then
+        assert(conn:send(message)) -- echo, any size
+    elseif err == fipc.DISCONNECTED then
+        break
+    else
+        error(err)
+    end
+end
+print("client gone")
+conn:close()
+listener:close()</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local conn = assert(fipc.connect("demo", 5000))
+for _, word in ipairs({ "hello", "shared", "memory" }) do
+    assert(conn:send(word))
+    print(assert(conn:recv()))
+end
+conn:close()</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">nil and the error's name</span></div>
+    <p class="intro">A call that succeeds returns its value, or <code>true</code> when it has none. A call that doesn't returns <code>nil</code> and the error's name: <code>"timeout"</code>, <code>"disconnected"</code>, <code>"cancelled"</code>, <code>"too_large"</code>, <code>"invalid"</code>, <code>"no_memory"</code> or <code>"addr_in_use"</code>, the C API's results (<code>fipc.TIMEOUT</code> and the others are the same strings; <code>fipc.result_str(err)</code> gives the C name). Wrap a call in <code>assert()</code> to raise instead. A misuse raises: a closed handle, an argument of the wrong type. The timeout comes last, in milliseconds: <code>fipc.NO_WAIT</code> (0) doesn't wait, <code>nil</code> or <code>fipc.FOREVER</code> waits as long as it takes. <code>"disconnected"</code> is final: close the connection, then accept or connect a new one.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>wait at most 100 ms</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local message, err = conn:recv(100) -- waits at most 100 ms
+if message then
+    handle(message)
+elseif err ~= fipc.TIMEOUT then -- "timeout": nothing yet, try again later
+    error(err) -- "disconnected": the peer is gone
+end</code></pre></div>
+      <div class="code"><div class="label"><span>a buffer of your own: "too_large" says how much room</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local buf = ffi.new("uint8_t[?]", 4096)
+local len, err, needed = conn:recv_into(buf, 4096)
+if err == fipc.TOO_LARGE then -- the message stays queued: make room, then take it
+    buf = ffi.new("uint8_t[?]", needed)
+    len = assert(conn:recv_into(buf, needed))
+end</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn:max_piece() bytes</span></div>
+    <p class="intro">Write a message into the ring and commit it; read one in the ring and release it. <code>send_acquire</code> returns a <code>uint8_t*</code> into the ring, 16-byte aligned; <code>send_commit</code> publishes its first bytes (all, or fewer). <code>recv_acquire</code> returns a <code>const uint8_t*</code> and the length, valid until <code>recv_release</code>, the next receive or <code>close</code>: copy out what you keep. A message of several pieces is <code>"too_large"</code> for <code>recv_acquire</code> and stays queued for <code>recv</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local slot = assert(conn:send_acquire(5)) -- room in the ring: a uint8_t*
+ffi.copy(slot, "hello", 5)
+assert(conn:send_commit(5))</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local data, len = assert(conn:recv_acquire()) -- a const uint8_t* into the ring
+handle(data, len) -- read it in place
+conn:recv_release() -- frees its room</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">{ id, kind, opcode, status, payload }</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status (an int32). Either side may submit. <code>rpc_recv</code> returns a table with the payload as a string; <code>rpc_recv_into(buf, size)</code> puts the payload in your buffer and returns the table with <code>len</code> in its place. A payload may be empty (<code>nil</code>). Ids are Lua numbers, from 1. Use a connection for RPC or for plain messages, not both. This server answers requests until its client leaves; either half makes the exchange above with the other half in any language.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>rpc_server.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local UPPER = 1
+
+local listener = assert(fipc.listen("my_channel", 1024 * 1024))
+local conn = assert(listener:accept())
+while true do
+    local req, err = conn:rpc_recv()
+    if not req then
+        if err == fipc.DISCONNECTED then
+            break
+        end
+        error(err)
+    end
+    if req.kind == fipc.RPC_REQUEST and req.opcode == UPPER then
+        assert(conn:rpc_respond(req.id, req.opcode, 0, req.payload:upper()))
+    end
+end
+conn:close()
+listener:close()</code></pre></div>
+      <div class="code"><div class="label"><span>rpc_client.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local UPPER = 1
+
+local conn = assert(fipc.connect("my_channel", 5000))
+local id = assert(conn:rpc_submit(UPPER, "ping"))
+local reply = assert(conn:rpc_recv())
+assert(reply.kind == fipc.RPC_RESPONSE and reply.id == id)
+print(reply.status, reply.payload) -- 0	PING
+conn:close()</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol</span></div>
+    <p class="intro">The <code>server.lua</code> and <code>client.lua</code> above work with a peer in any of the ten languages: <a href="index.html#interop">every pair of languages is tested</a>.</p>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads and coroutines</h2><span class="eyebrow">one Lua state, one thread</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>A Lua state runs one thread at a time, so the C API's rule (on a connection, one thread sends and one receives) holds by itself. A call that waits blocks the whole state, every coroutine in it: in a coroutine scheduler, poll with <code>fipc.NO_WAIT</code> and yield while nothing has arrived. In OpenResty a call that waits blocks the nginx worker, so poll and <code>ngx.sleep</code> between polls; in Neovim, poll from a <code>vim.uv</code> timer.</p>
+        <p><code>conn:cancel()</code> makes every call of the connection that waits, then or later, return <code>"cancelled"</code>. A listener or connection belongs to the Lua state that made it; another state (another thread: <code>love.thread</code>, Lanes) opens a connection of its own. <code>close()</code> ends a connection at once; one the program drops is closed when the garbage collector frees it.</p>
+      </div>
+      <div class="code"><div class="label"><span>yield until a message comes</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">-- In a coroutine scheduler: poll, and yield until a message (or an error) comes
+local function receive(conn)
+    while true do
+        local message, err = conn:recv(fipc.NO_WAIT)
+        if message or err ~= fipc.TIMEOUT then
+            return message, err
+        end
+        coroutine.yield()
+    end
+end</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="games" aria-labelledby="h-games">
+    <div class="plate-head"><h2 id="h-games">Games and frame loops</h2><span class="eyebrow">never block a frame</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>Poll the connection once a frame with <code>fipc.NO_WAIT</code>: send what the frame produced, then take every message that has arrived until <code>"timeout"</code> says there is none. In LÖVE, do it in <code>love.update</code>; a game that embeds LuaJIT does it in its own update. A send with <code>NO_WAIT</code> returns <code>"timeout"</code> only when the ring is full.</p>
+        <p><code>game_loop.lua</code> runs against <code>echo_server.lua</code> above, sleeping for the rest of each frame as an engine's loop would.</p>
+      </div>
+      <div class="code"><div class="label"><span>game_loop.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local ffi = require("ffi")
+local fipc = require("fipc")
+
+-- The rest of a frame (a game engine's loop does this for you)
+local sleep
+if ffi.os == "Windows" then
+    ffi.cdef("void Sleep(uint32_t ms);")
+    sleep = function(ms) ffi.C.Sleep(ms) end
+else
+    ffi.cdef("int usleep(uint32_t us);")
+    sleep = function(ms) ffi.C.usleep(ms * 1000) end
+end
+
+local conn = assert(fipc.connect("demo", 5000))
+local echoes = 0
+for frame = 1, 60 do
+    assert(conn:send(tostring(frame), fipc.NO_WAIT)) -- "timeout" only if the ring is full
+    while true do
+        local echo, err = conn:recv(fipc.NO_WAIT)
+        if echo then
+            echoes = echoes + 1
+        elseif err == fipc.TIMEOUT then
+            break -- nothing more this frame
+        else
+            error(err) -- "disconnected": the peer is gone
+        end
+    end
+    sleep(16)
+end
+print(echoes .. " echoes in 60 frames")
+conn:close()</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="setup" aria-labelledby="h-setup">
+    <div class="plate-head"><h2 id="h-setup">Install and ship</h2><span class="eyebrow">LuaJIT 2.1 · x86-64-v3 · ARM64 Linux · Apple Silicon</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>The rock installs the module and the library for your platform; LuaRocks must be set up for LuaJIT (<code>--lua-version 5.1</code>, <code>--lua-dir</code>). PUC Lua (5.1 to 5.4) has no FFI and isn't supported. Without LuaRocks, ship <code>fipc.lua</code> with <code>fastipc.dll</code>, <code>libfastipc.so</code> or <code>libfastipc.dylib</code> beside it, in a folder on <code>package.path</code>: the GitHub release's <code>fipc-lua-1.0.0.tar.gz</code> holds the module and every platform's library.</p>
+        <p>The module looks for the library in the folder <code>FASTIPC_LIB_DIR</code> names, then (in a checkout of the repository) its <code>zig-out</code> build, then its own folder, then the rock's copy on <code>package.cpath</code>, then the system's search. <code>fipc.library</code> says which file it loaded; the library stays loaded until the process ends.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>with LuaRocks, for LuaJIT</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash">luarocks --lua-version 5.1 install fipc
+luajit -e 'print(require("fipc").library)'</code></pre></div>
+        <div class="code"><div class="label"><span>shipped next to your code</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-plaintext">game/
+  main.lua
+  fipc.lua
+  fastipc.dll        (Windows; libfastipc.so on Linux, libfastipc.dylib on macOS)</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow"><a href="https://github.com/fastipc/fastipc/blob/main/bindings/lua/fipc.lua">fipc.lua</a></span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>fipc.listen(name, capacity)</code></td><td>Claims the name and listens: a listener; <code>"addr_in_use"</code> if another listener holds it.</td></tr>
+          <tr><td><code>listener:accept(timeout)</code></td><td>Sets the next client's connection up and returns it. One client at a time: close it before the next accept. <code>fipc.NO_WAIT</code> polls.</td></tr>
+          <tr><td><code>listener:cancel()</code> · <code>close()</code></td><td>Cancel waiting accepts · stop listening; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>fipc.connect(name, timeout)</code></td><td>Connects to the server listening on the name, waiting for it to listen and accept: a connection. The server runs in another process.</td></tr>
+          <tr><td><code>conn:send(data, timeout)</code></td><td>Sends one message of any size: a string, or <code>ptr, len</code>. Returns <code>true</code>.</td></tr>
+          <tr><td><code>conn:recv(timeout)</code></td><td>Receives one message of any size, as a string.</td></tr>
+          <tr><td><code>conn:recv_into(buf, size, timeout)</code></td><td>Receives into your buffer and returns the length; <code>nil, "too_large", len</code> if it doesn't fit.</td></tr>
+          <tr><td><code>conn:send_acquire(len, timeout)</code> · <code>send_commit(len)</code></td><td>Zero-copy send: a <code>uint8_t*</code> into the ring, then publish.</td></tr>
+          <tr><td><code>conn:recv_acquire(timeout)</code> · <code>recv_release()</code></td><td>Zero-copy receive: a <code>const uint8_t*</code> and the length, then free its room.</td></tr>
+          <tr><td><code>conn:rpc_submit(opcode, payload, timeout)</code></td><td>Sends a request; returns its id.</td></tr>
+          <tr><td><code>conn:rpc_respond(id, opcode, status, payload, timeout)</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>conn:rpc_recv(timeout)</code> · <code>rpc_recv_into(buf, size, timeout)</code></td><td>Receives one request or response: <code>{ id, kind, opcode, status, payload }</code> · the payload in your buffer and <code>len</code> in the table.</td></tr>
+          <tr><td><code>conn:max_piece()</code> · <code>cancel()</code> · <code>ended()</code> · <code>close()</code></td><td>The zero-copy limit · cancel waiting calls · whether a call returned <code>"disconnected"</code> · end the connection.</td></tr>
+          <tr class="sep"><td><code>fipc.NO_WAIT</code> · <code>FOREVER</code> · <code>RPC_REQUEST</code> · <code>RPC_RESPONSE</code></td><td>0 · -1 · 1 · 2.</td></tr>
+          <tr><td><code>fipc.TIMEOUT</code> … <code>fipc.ADDR_IN_USE</code> · <code>result_str(err)</code></td><td>The error names · the C name of one (<code>"FIPC_TIMEOUT"</code>).</td></tr>
+          <tr><td><code>fipc.library</code> · <code>fipc.C</code> · <code>fipc._VERSION</code></td><td>The library's path · its FFI namespace, the C API · <code>"1.0.0"</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding on LuaJIT, copied 16-byte messages run at 49 to 56 million per second between two processes, and 64 KiB messages at 440,000 to 500,000 per second (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

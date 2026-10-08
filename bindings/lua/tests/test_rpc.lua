@@ -1,0 +1,116 @@
+-- RPC against a Lua peer in another process, as the server (tests/peer.lua echo_rpc connects) and as the client
+-- (tests/peer.lua rpc_server listens).
+
+local ffi = require("ffi")
+local support = require("support")
+local fipc = support.fipc
+local eq, fails = support.eq, support.fails
+
+local suite = support.suite("rpc")
+local test = suite.test
+
+test("requests and responses, as the server", function()
+    local name = support.unique_name("rpc")
+    local listener = assert(fipc.listen(name, support.RING))
+    local peer = support.peer("echo_rpc", name)
+    local conn = assert(listener:accept(support.TEN_SECONDS))
+    for expected_id, payload in ipairs({ "abc", "", support.pattern(300000), "x" }) do
+        local id = assert(conn:rpc_submit(7, payload, support.TEN_SECONDS))
+        eq(id, expected_id, "the request's id")
+        local reply = assert(conn:rpc_recv(support.TEN_SECONDS))
+        eq(reply.kind, fipc.RPC_RESPONSE)
+        eq(reply.id, id)
+        eq(reply.opcode, 7)
+        eq(reply.status, #payload)
+        eq(reply.payload, payload:reverse())
+    end
+    eq(conn:rpc_submit(1, nil, support.TEN_SECONDS), 5) -- no payload
+    eq(assert(conn:rpc_recv(support.TEN_SECONDS)).payload, "")
+    -- A cdata payload, and the opcodes' full range
+    local buf = ffi.new("char[4]", "wxyz")
+    local id = assert(conn:rpc_submit(0xFFFFFFFF, buf, 4, support.TEN_SECONDS))
+    local reply = assert(conn:rpc_recv(support.TEN_SECONDS))
+    eq(reply.id, id)
+    eq(reply.opcode, 0xFFFFFFFF)
+    eq(reply.payload, "zyxw")
+    conn:close()
+    listener:close()
+    eq(peer:wait(), 0, "the peer's exit code")
+end)
+
+test("rpc_recv_into, and a payload too long for the buffer", function()
+    local name = support.unique_name("rpc_into")
+    local listener = assert(fipc.listen(name, support.RING))
+    local peer = support.peer("echo_rpc", name)
+    local conn = assert(listener:accept(support.TEN_SECONDS))
+    local buf = ffi.new("uint8_t[?]", 64)
+    local id = assert(conn:rpc_submit(3, "short", support.TEN_SECONDS))
+    local header = assert(conn:rpc_recv_into(buf, 64, support.TEN_SECONDS))
+    eq(header.id, id)
+    eq(header.kind, fipc.RPC_RESPONSE)
+    eq(header.opcode, 3)
+    eq(header.status, 5)
+    eq(header.len, 5)
+    eq(ffi.string(buf, header.len), "trohs")
+    local long = support.pattern(1000)
+    id = assert(conn:rpc_submit(4, long, support.TEN_SECONDS))
+    fails("too_large", 1000, conn:rpc_recv_into(buf, 64, support.TEN_SECONDS))
+    local reply = assert(conn:rpc_recv(support.TEN_SECONDS)) -- still queued
+    eq(reply.id, id)
+    eq(reply.payload, long:reverse())
+    conn:close()
+    listener:close()
+    eq(peer:wait(), 0, "the peer's exit code")
+end)
+
+test("requests and responses, as the client", function()
+    local name = support.unique_name("rpc_client")
+    local peer = support.peer("rpc_server", name)
+    local conn = assert(fipc.connect(name, support.TEN_SECONDS))
+    local first = assert(conn:rpc_submit(1, "shared memory", support.TEN_SECONDS))
+    local long = string.rep("abc", 100000)
+    local second = assert(conn:rpc_submit(2, long, support.TEN_SECONDS))
+    local one = assert(conn:rpc_recv(support.TEN_SECONDS))
+    eq(one.id, first)
+    eq(one.status, -1)
+    eq(one.payload, "SHARED MEMORY")
+    local two = assert(conn:rpc_recv(support.TEN_SECONDS))
+    eq(two.id, second)
+    eq(two.payload, long:upper())
+    fails("timeout", nil, conn:rpc_recv(fipc.NO_WAIT))
+    conn:close()
+    eq(peer:wait(), 0, "the peer's exit code")
+end)
+
+test("a response's status is any int32", function()
+    local name = support.unique_name("rpc_status")
+    local listener = assert(fipc.listen(name, support.RING))
+    local peer = support.peer("rpc_statuses", name)
+    local conn = assert(listener:accept(support.TEN_SECONDS))
+    for _, status in ipairs({ 0, -1, 2147483647, -2147483648 }) do
+        local id = assert(conn:rpc_submit(9, "?", support.TEN_SECONDS))
+        local reply = assert(conn:rpc_recv(support.TEN_SECONDS))
+        eq(reply.id, id)
+        eq(reply.status, status)
+        eq(reply.payload, "")
+    end
+    conn:close()
+    listener:close()
+    eq(peer:wait(), 0, "the peer's exit code")
+end)
+
+test("a plain message is not an RPC message", function()
+    local name = support.unique_name("rpc_plain")
+    local listener = assert(fipc.listen(name, support.RING))
+    local peer = support.peer("echo", name)
+    local conn = assert(listener:accept(support.TEN_SECONDS))
+    assert(conn:send("plain", support.TEN_SECONDS))
+    fails("invalid", nil, conn:rpc_recv(support.TEN_SECONDS)) -- dropped
+    assert(conn:send("again", support.TEN_SECONDS))
+    eq(conn:recv(support.TEN_SECONDS), "again")
+    conn:close()
+    listener:close()
+    eq(peer:wait(), 0, "the peer's exit code")
+end)
+
+return suite

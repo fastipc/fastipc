@@ -1,0 +1,89 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+    <AssemblyName>Fipc</AssemblyName>
+    <RootNamespace>FastIpc</RootNamespace>
+
+    <!-- NuGet package metadata -->
+    <PackageId>Fipc</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Hayden Donnelly</Authors>
+    <Company>Hayden Donnelly</Company>
+    <Product>FastIPC</Product>
+    <Description>Shared-memory IPC for .NET: messages and RPC between two processes on one machine, the C# binding of FastIPC, a small library written in Zig (include/fipc.h). Native libraries for Windows x64 and Linux x64 (glibc 2.34+), x86-64-v3 CPUs, Linux arm64 (glibc 2.34+) and macOS arm64 (14.4+) included.</Description>
+    <PackageTags>ipc;shared-memory;interprocess;rpc;zero-copy;messaging;interop;native;performance</PackageTags>
+    <PackageProjectUrl>https://fastipc.github.io/fastipc/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/fastipc/fastipc</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2025-2026 Hayden Donnelly</Copyright>
+
+    <!-- NuGet package settings: SourceLink (part of the .NET 8+ SDK) maps the symbols to the GitHub sources -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <DebugType>portable</DebugType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Where the native libraries are: runtimes/ next to this file (a development build copies them there), or
+         the folder `devtool package` passes (-p:FipcRuntimesDir=...), in the same {rid}/native/ layout -->
+    <FipcRuntimesDir Condition="'$(FipcRuntimesDir)' == ''">$(MSBuildThisFileDirectory)runtimes</FipcRuntimesDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The package page's README and the license's text -->
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+
+    <!-- Native libraries in the NuGet runtimes/ layout -->
+    <None Include="$(FipcRuntimesDir)/linux-x64/native/libfastipc.so"
+          Pack="true"
+          PackagePath="runtimes/linux-x64/native/"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="runtimes/linux-x64/native/libfastipc.so"
+          Condition="Exists('$(FipcRuntimesDir)/linux-x64/native/libfastipc.so')" />
+
+    <None Include="$(FipcRuntimesDir)/win-x64/native/fastipc.dll"
+          Pack="true"
+          PackagePath="runtimes/win-x64/native/"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="runtimes/win-x64/native/fastipc.dll"
+          Condition="Exists('$(FipcRuntimesDir)/win-x64/native/fastipc.dll')" />
+
+    <None Include="$(FipcRuntimesDir)/linux-arm64/native/libfastipc.so"
+          Pack="true"
+          PackagePath="runtimes/linux-arm64/native/"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="runtimes/linux-arm64/native/libfastipc.so"
+          Condition="Exists('$(FipcRuntimesDir)/linux-arm64/native/libfastipc.so')" />
+
+    <None Include="$(FipcRuntimesDir)/osx-arm64/native/libfastipc.dylib"
+          Pack="true"
+          PackagePath="runtimes/osx-arm64/native/"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="runtimes/osx-arm64/native/libfastipc.dylib"
+          Condition="Exists('$(FipcRuntimesDir)/osx-arm64/native/libfastipc.dylib')" />
+
+    <!-- The Windows library next to the executable too, for project-reference consumers -->
+    <None Include="$(FipcRuntimesDir)/win-x64/native/fastipc.dll"
+          Pack="false"
+          Link="fastipc.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('$(FipcRuntimesDir)/win-x64/native/fastipc.dll')" />
+
+    <!-- The macOS library next to the executable too, when building on a Mac, for project-reference consumers -->
+    <None Include="$(FipcRuntimesDir)/osx-arm64/native/libfastipc.dylib"
+          Pack="false"
+          Link="libfastipc.dylib"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('$(FipcRuntimesDir)/osx-arm64/native/libfastipc.dylib') And $([MSBuild]::IsOSPlatform('OSX'))" />
+  </ItemGroup>
+
+</Project>

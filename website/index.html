@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC: shared-memory IPC and RPC between two processes</title>
+<meta name="description" content="FastIPC is shared-memory IPC between two processes on one machine: messages and RPC from a small Zig library, for C, C++, Zig, Python, C#, Java, Rust, Lua, JavaScript and Go.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC: shared-memory IPC and RPC between two processes">
+<meta property="og:description" content="FastIPC is shared-memory IPC between two processes on one machine: messages and RPC from a small Zig library, for C, C++, Zig, Python, C#, Java, Rust, Lua, JavaScript and Go.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC: shared-memory IPC and RPC between two processes">
+<meta name="twitter:description" content="FastIPC is shared-memory IPC between two processes on one machine: messages and RPC from a small Zig library, for C, C++, Zig, Python, C#, Java, Rust, Lua, JavaScript and Go.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "FastIPC",
+  "description": "FastIPC is shared-memory IPC between two processes on one machine: messages and RPC from a small Zig library, for C, C++, Zig, Python, C#, Java, Rust, Lua, JavaScript and Go.",
+  "url": "https://fastipc.github.io/fastipc/",
+  "codeRepository": "https://github.com/fastipc/fastipc",
+  "programmingLanguage": [
+    "Zig",
+    "C",
+    "C++",
+    "Python",
+    "C#",
+    "Java",
+    "Rust",
+    "Lua",
+    "JavaScript",
+    "Go"
+  ],
+  "runtimePlatform": [
+    "Linux",
+    "Windows",
+    "macOS"
+  ],
+  "license": "https://opensource.org/licenses/MIT",
+  "version": "1.0.0",
+  "author": {
+    "@type": "Person",
+    "name": "Hayden Donnelly"
+  }
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,500;0,600;1,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html" aria-current="page">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- HERO -->
+  <section class="hero" aria-labelledby="title">
+    <div class="stack">
+      <div class="badges">
+        <span class="badge acc">v1.0.0</span><span class="badge">MIT</span><span class="badge">x86-64-v3 · ARM64 Linux · Apple Silicon</span>
+        <span class="badge">Linux · Windows · macOS</span><span class="badge">Zig · C · C++ · Python · C# · Java · Rust · Lua · JavaScript · Go</span>
+      </div>
+      <h1 id="title">fast<span class="acc">ipc</span></h1>
+      <p class="tagline">Messages and RPC between two processes on one machine, through shared memory.</p>
+      <p class="lede">A small library written in Zig, <code>fastipc.dll</code> / <code>libfastipc.so</code> / <code>libfastipc.dylib</code>. Each connection is a
+        pair of lock-free rings in memory both processes map, and a local socket that tells each side the moment the
+        other one is gone. Use it from C, C++, Zig, Python, C#, Java, Rust, Lua, JavaScript or Go, with <a href="#interop">any of them on
+        the other end</a>.</p>
+      <div class="actions">
+        <a class="btn primary" href="#quickstart">Quick start</a>
+        <a class="btn" href="https://github.com/fastipc/fastipc">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+          fastipc/fastipc
+        </a>
+      </div>
+      <div class="installs">
+        <div class="install"><span class="lang">Python</span><code>pip install fipc-python</code><button class="copy" type="button" data-copy="pip install fipc-python">copy</button></div>
+        <div class="install"><span class="lang">C#</span><code>dotnet add package Fipc</code><button class="copy" type="button" data-copy="dotnet add package Fipc">copy</button></div>
+        <div class="install"><span class="lang">Java</span><code class="coords">io.github.fastipc:fipc:1.0.0</code><button class="copy" type="button" data-copy="io.github.fastipc:fipc:1.0.0">copy</button></div>
+        <div class="install"><span class="lang">Rust</span><code>cargo add fipc</code><button class="copy" type="button" data-copy="cargo add fipc">copy</button></div>
+        <div class="install"><span class="lang">Lua</span><code>luarocks install fipc</code><button class="copy" type="button" data-copy="luarocks install fipc">copy</button></div>
+        <div class="install"><span class="lang">JS</span><code>npm install fipc</code><button class="copy" type="button" data-copy="npm install fipc">copy</button></div>
+        <div class="install"><span class="lang">Go</span><code>go get github.com/fastipc/fastipc/bindings/go/fipc@latest</code><button class="copy" type="button" data-copy="go get github.com/fastipc/fastipc/bindings/go/fipc@latest">copy</button></div>
+      </div>
+    </div>
+
+    <div class="sheet" aria-label="Headline measurements">
+      <div class="sheet-head"><b>DATASHEET</b><span>ReleaseFast · 512 KiB rings</span></div>
+      <div class="sheet-scroll"><table>
+        <thead><tr class="hw"><td></td><th scope="colgroup" colspan="2">Intel Core i9 laptop</th><th scope="colgroup" colspan="2">MacBook Air M1</th></tr>
+          <tr><th scope="col">Measure</th><th scope="col" class="n">Linux x86&#8209;64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead>
+        <tbody>
+          <tr><td>Round trip, p50&dagger;</td><td class="n big">237 ns</td><td class="n big">263 ns</td><td class="n big">167 ns</td><td class="n big">208 ns</td></tr>
+          <tr><td>Zero-copy, 16&nbsp;B</td><td class="n">57.5M/s</td><td class="n">47.9M/s</td><td class="n">56.2M/s</td><td class="n">54.7M/s</td></tr>
+          <tr><td>Copy, 1&nbsp;KiB</td><td class="n">21.4M/s</td><td class="n">16.8M/s</td><td class="n">27.0M/s</td><td class="n">26.1M/s</td></tr>
+          <tr><td>Copy, 64&nbsp;KiB</td><td class="n">30 GiB/s</td><td class="n">26 GiB/s</td><td class="n">40 GiB/s</td><td class="n">39 GiB/s</td></tr>
+          <tr><td>RPC, 16&nbsp;B</td><td class="n">43.9M/s</td><td class="n">44.0M/s</td><td class="n">51.4M/s</td><td class="n">42.6M/s</td></tr>
+          <tr><td>Allocations per message</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+        </tbody>
+      </table></div>
+      <p class="hwnote"><b>Intel Core i9-13900H</b> laptop, 6 P-cores (Hyper&#8209;Threading) and 8 E-cores, 32&nbsp;GB: Windows 11, and Linux in WSL2 (20 vCPUs).<br><b>Apple M1</b> MacBook Air, 4 P-cores and 4 E-cores, 8&nbsp;GB: macOS, and Linux in a VM (4 vCPUs, 4&nbsp;GB).<br>The two Linux columns differ in the hardware, the two M1 columns in the operating system. <a href="performance.html#machine">The machines</a></p>
+      <div class="foot">Messages per second between two processes, unpinned. &dagger;&nbsp;Both sides spinning, at each OS&#x27;s fastest message size: 16&nbsp;B, or 8&nbsp;B on Windows. <a href="performance.html">Method and full tables</a>.</div>
+    </div>
+  </section>
+
+  <!-- SMALL ON PURPOSE -->
+  <section class="plate" id="small" aria-labelledby="h-small">
+    <div class="plate-head"><h2 id="h-small">Small on purpose</h2><span class="eyebrow">from <a href="https://github.com/fastipc/fastipc/blob/main/docs/design/architecture.md">docs/design/architecture.md</a></span></div>
+    <p class="intro">A minimal core that still does everything: messages of any size, zero-copy, RPC and the peer's end, without making you handle the hard cases yourself.</p>
+    <div class="cols-2">
+      <div class="feature">
+        <!-- The line count, the one place on the site that states it (README.md's "Small." says it too): `python devtool.py loc`,
+             row "library: src/zig up to each file's tests", column Code (no blank lines, comments or tests). -->
+        <span class="tag">3,398 lines of Zig</span>
+        <h3>The whole library, small enough to read</h3>
+        <p>Everything behind <code>fipc.h</code>, every platform included, is 3,398 lines of Zig code, not counting blank lines, comments and tests.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">fipc_connect · fipc_accept</span>
+        <h3>Either order, any restart</h3>
+        <p>Start the server or the client first: <code>fipc_connect</code> waits, within its timeout, for a server to listen and accept. Restart either side at any time: the other side receives every message the old process completed, then gets <code>FIPC_DISCONNECTED</code>, and its next <code>fipc_accept</code> or <code>fipc_connect</code> pairs it with the new one. A game loop can poll: <code>fipc_accept</code> with timeout 0 lets a client in within two calls.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">fipc_result_t</span>
+        <h3>A specific error for every failure</h3>
+        <p>Every call returns one of eight result codes, named for what happened: <code>FIPC_DISCONNECTED</code>, the peer went away; <code>FIPC_TIMEOUT</code>, the call timed out and changed nothing; <code>FIPC_TOO_LARGE</code>, the message doesn't fit your buffer, so it stays queued and its length is reported; <code>FIPC_ADDR_IN_USE</code>, another server has the name. <a href="c.html#results">All eight</a>.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">one copy · one swap</span>
+        <h3>Free on the hot path</h3>
+        <p>A message is one copy into shared memory, a store and an atomic swap; the system call that wakes the other side happens only when it has gone to sleep. The peer's end never touches the rings, and a call that doesn't wait reads no clock. Copied 16-byte messages run at 49.1 million per second between two processes (Windows; <a href="performance.html#library">all measurements</a>).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANY LANGUAGE: the grid lists devtool_lib/interop.py's languages, in its order (check_docs compares them) -->
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol · 100 pairs, tested</span></div>
+    <p class="intro">One library speaks one protocol, and every binding calls that library, so a process written in any of the ten languages talks to a process written in any other. The two processes agree on a name and on what their messages mean; the library carries the bytes.</p>
+    <div class="interop">
+      <div class="stack">
+        <p>Each language's server and client in the <a href="#quickstart">quick start</a> make the same exchange, an RPC request with the payload <code>ping</code>, answered with <code>PING</code>. The repository's interop test, <code>python devtool.py test interop</code>, runs every language's server against every language's client, each in a process of its own, on Linux, Windows and macOS.</p>
+        <div class="code"><div class="label"><span>a Rust server, a Python client</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash"># terminal 1, in bindings/rust
+cargo run --example server
+
+# terminal 2, next to client.py
+python client.py
+# b'PING'</code></pre></div>
+        <p class="note">The two programs are the quick start's <a href="https://github.com/fastipc/fastipc/blob/main/bindings/rust/fipc/examples/server.rs"><code>server.rs</code></a> and <a href="https://github.com/fastipc/fastipc/blob/main/examples/python/client.py"><code>client.py</code></a>, unchanged.</p>
+      </div>
+      <figure class="matrix-fig">
+        <div class="table-wrap">
+          <table class="data matrix" id="interop-grid">
+            <thead><tr><th scope="col" class="corner">server ↓<br>client →</th><th scope="col">Zig</th><th scope="col">C</th><th scope="col">C++</th><th scope="col">Python</th><th scope="col">C#</th><th scope="col">Java</th><th scope="col">Rust</th><th scope="col">Lua</th><th scope="col">JavaScript</th><th scope="col">Go</th></tr></thead>
+            <tbody>
+            <tr><th scope="row">Zig</th><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">C</th><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">C++</th><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">Python</th><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">C#</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">Java</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">Rust</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">Lua</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td><td>✓</td></tr>
+            <tr><th scope="row">JavaScript</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td><td>✓</td></tr>
+            <tr><th scope="row">Go</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="same">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption>Servers in rows, clients in columns: every pair, a language with itself included, makes the exchange in the interop test. The server starts first; for one pair per server the client starts first and waits for it.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="plate" id="features" aria-labelledby="h-features">
+    <div class="plate-head"><h2 id="h-features">What it gives you</h2><span class="eyebrow">from <a href="https://github.com/fastipc/fastipc/blob/main/include/fipc.h">include/fipc.h</a></span></div>
+    <div class="features">
+      <div class="feature">
+        <span class="tag">SPSC rings</span>
+        <h3>Two rings in shared memory</h3>
+        <p>Every connection gets a segment of its own with one single-producer, single-consumer ring per direction. Messages never leave shared memory. The writer's and the reader's indices sit on cache lines of their own, and a publish touches one line.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">futex · event</span>
+        <h3>Spin, then sleep</h3>
+        <p>A waiting side spins briefly, then sleeps on a futex (Linux), an <code>os_sync</code> address wait (macOS) or a named event (Windows). A publish costs one store and one locked swap, and the sleep protocol never loses a wake-up.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">acquire · commit · release</span>
+        <h3>Zero-copy, or any size</h3>
+        <p>Write a message straight into the ring and read it in place, 16-byte aligned. The copying calls take messages of any size: longer than the ring, they travel in pieces and arrive whole. Nothing is allocated per message.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">FIPC_DISCONNECTED</span>
+        <h3>Knows when the peer is gone</h3>
+        <p>A local control connection per connection (an abstract <code>AF_UNIX</code> socket, a named pipe) reports the peer's end as soon as its process exits or closes. No heartbeat, no timeouts, nothing left behind after a crash.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">fipc_rpc_*</span>
+        <h3>A thin RPC layer</h3>
+        <p>Requests and responses with ids, an opcode and a status, as a 32-byte header in front of a plain message. Either side may submit and respond, with payloads of any size.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">protocol v1</span>
+        <h3>A specified protocol</h3>
+        <p>Names, control frames, the segment header, ring frames and wake-ups are written down, so two builds interoperate bit for bit. Everything the peer writes is checked: corrupt ring content returns <code>FIPC_INVALID</code>, never a crash.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">18 functions</span>
+        <h3>Small enough to read</h3>
+        <p>One header of 18 functions in front of a library you can read end to end (<a href="#small">how small</a>). The tests are about twice its size.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">tests · TSan · chaos · fuzz</span>
+        <h3>Tested to break</h3>
+        <p>Unit tests, a C-API conformance suite run in one process and across processes (peers killed at every step of the handshake included), ThreadSanitizer runs, and chaos, soak and fuzz harnesses.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="plate" id="how" aria-labelledby="h-how">
+    <div class="plate-head"><h2 id="h-how">How it works</h2><span class="eyebrow">from <a href="https://github.com/fastipc/fastipc/blob/main/docs/protocol.md">docs/protocol.md</a></span></div>
+    <p class="intro">A server listens on a name and accepts one client at a time; a client connects to the name. Only processes of the same user can connect.</p>
+    <figure>
+      <div class="fig">
+        <svg viewBox="0 0 1000 440" role="img" aria-label="Two processes. Between them, a shared segment with a 384-byte header, the s2c ring that the server writes and the client reads, and the c2s ring that the client writes and the server reads. Below, the control connection, which fipc_accept and fipc_connect set up on the calling threads and a watcher on each side then reads, carries SEGMENT from server to client, READY back, and then nothing until its end, which tells the other side the peer is gone.">
+          <defs>
+            <marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-a" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="ms" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-s" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="mw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-w" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+
+          <!-- server process -->
+          <rect class="proc" x="20" y="20" width="260" height="400" rx="6"/>
+          <text class="h" x="36" y="44">SERVER PROCESS</text>
+          <rect class="b" x="36" y="60" width="228" height="190" rx="3"/>
+          <text class="t" x="50" y="84">your threads</text>
+          <text class="s" x="50" y="106">fipc_send · fipc_send_acquire</text>
+          <text class="s" x="50" y="122">fipc_recv · fipc_recv_acquire</text>
+          <text class="s" x="50" y="138">fipc_rpc_submit · _respond</text>
+          <text class="s" x="50" y="154">fipc_rpc_recv</text>
+          <text class="s" x="50" y="192">one thread sends and one</text>
+          <text class="s" x="50" y="208">receives, at the same time</text>
+          <rect class="ba" x="36" y="300" width="228" height="100" rx="3"/>
+          <text class="h" x="50" y="324">fipc_accept, then a watcher</text>
+          <text class="s" x="50" y="344">accepts, creates the segment,</text>
+          <text class="s" x="50" y="360">sends SEGMENT, waits for READY;</text>
+          <text class="s" x="50" y="376">the watcher reads until EOF</text>
+
+          <!-- client process -->
+          <rect class="proc" x="720" y="20" width="260" height="400" rx="6"/>
+          <text class="h" x="736" y="44">CLIENT PROCESS</text>
+          <rect class="b" x="736" y="60" width="228" height="190" rx="3"/>
+          <text class="t" x="750" y="84">your threads</text>
+          <text class="s" x="750" y="106">fipc_connect, then the</text>
+          <text class="s" x="750" y="122">same calls as the server:</text>
+          <text class="s" x="750" y="138">either side may send</text>
+          <text class="s" x="750" y="154">and receive</text>
+          <rect class="ba" x="736" y="300" width="228" height="100" rx="3"/>
+          <text class="h" x="750" y="324">fipc_connect, then a watcher</text>
+          <text class="s" x="750" y="344">connects, checks and maps</text>
+          <text class="s" x="750" y="360">the segment, sends READY;</text>
+          <text class="s" x="750" y="376">the watcher reads until EOF</text>
+
+          <!-- segment -->
+          <rect class="bs" x="330" y="20" width="340" height="250" rx="4"/>
+          <text class="h shm-t" x="346" y="42">SHARED SEGMENT</text>
+          <text class="s" x="346" y="57">one per connection, mapped by both</text>
+          <rect class="bg" x="346" y="66" width="308" height="30" rx="2"/>
+          <text class="s" x="356" y="85">header, 384 B: indices, sleep flags</text>
+          <text class="t" x="346" y="122">s2c ring · server → client</text>
+          <rect class="b" x="346" y="130" width="308" height="36" rx="2"/>
+          <rect class="bs" x="430" y="136" width="30" height="24"/><rect class="bs" x="464" y="136" width="52" height="24"/><rect class="bs" x="520" y="136" width="20" height="24"/>
+          <text class="s" x="562" y="152">frames</text>
+          <text class="t" x="346" y="196">c2s ring · client → server</text>
+          <rect class="b" x="346" y="204" width="308" height="36" rx="2"/>
+          <rect class="bs" x="478" y="210" width="40" height="24"/><rect class="bs" x="522" y="210" width="26" height="24"/>
+          <text class="s" x="346" y="259">ring size: a power of two, 1 KiB to 2 GiB</text>
+
+          <!-- data path: each label sits in the gap between a process and the segment -->
+          <line class="ls" x1="264" y1="148" x2="344" y2="148" marker-end="url(#ms)"/>
+          <text class="s shm-t" x="297" y="141" text-anchor="middle">write</text>
+          <line class="ls" x1="654" y1="148" x2="734" y2="148" marker-end="url(#ms)"/>
+          <text class="s shm-t" x="703" y="141" text-anchor="middle">read</text>
+          <line class="ls" x1="736" y1="222" x2="656" y2="222" marker-end="url(#ms)"/>
+          <text class="s shm-t" x="703" y="215" text-anchor="middle">write</text>
+          <line class="ls" x1="346" y1="222" x2="266" y2="222" marker-end="url(#ms)"/>
+          <text class="s shm-t" x="297" y="215" text-anchor="middle">read</text>
+
+          <!-- control connection -->
+          <text class="h" x="500" y="298" text-anchor="middle">control connection</text>
+          <text class="s" x="500" y="314" text-anchor="middle">Linux: abstract AF_UNIX socket · Windows: named pipe · macOS: socket file</text>
+          <line class="la" x1="266" y1="342" x2="732" y2="342" marker-end="url(#ma)"/>
+          <text class="s acc-t" x="500" y="336" text-anchor="middle">1 · SEGMENT (64 B): capacity, session id</text>
+          <line class="la" x1="734" y1="370" x2="268" y2="370" marker-end="url(#ma)"/>
+          <text class="s acc-t" x="500" y="364" text-anchor="middle">2 · READY (64 B)</text>
+          <line class="lw" x1="268" y1="396" x2="732" y2="396" marker-end="url(#mw)" marker-start="url(#mw)"/>
+          <text class="s warn-t" x="500" y="390" text-anchor="middle">3 · then silent; its end means the peer is gone</text>
+        </svg>
+      </div>
+      <p class="fig-hint" aria-hidden="true">Scroll the diagram sideways to see all of it.</p>
+      <figcaption>Linux passes the segment as a sealed <code>memfd</code> with the SEGMENT frame and wakes sleepers with a futex on the ring's sleep flag. Windows uses a pagefile-backed section and four auto-reset named events per connection. macOS passes an unnamed POSIX shared memory object with SEGMENT and wakes sleepers with <code>os_sync_wait_on_address</code>. Linux and Windows leave nothing behind after a crash; on macOS a crashed listener's socket file and lock file stay only until the same user's next listen removes them, and never get in the way.</figcaption>
+      <div class="key"><span><span class="sw shm"></span>shared memory, the data path</span><span><span class="sw acc"></span>control: setup and the peer's end</span></div>
+    </figure>
+
+    <ol class="steps">
+      <li><h3>Set up</h3><p>The server's <code>fipc_accept</code> accepts the client, creates a zeroed segment and offers it in a SEGMENT frame. The client's <code>fipc_connect</code> checks the frame and the segment's header, maps it and answers READY. Both run on the calling threads, so a client and its server run on different threads or processes. <code>fipc_connect</code> can return before the server's <code>fipc_accept</code> does; messages sent meanwhile wait in the ring.</p></li>
+      <li><h3>Talk</h3><p>Messages go through the rings and never touch the control connection. A frame is a 16-byte header and a piece, and never wraps, so every piece is contiguous and the zero-copy calls can hand out pointers into the ring.</p></li>
+      <li><h3>End</h3><p>When a process closes the connection or exits for any reason, the kernel closes its end of the control connection. The other side reads EOF: its sends return <code>FIPC_DISCONNECTED</code> at once, and its receives do so after delivering every message the peer completed.</p></li>
+    </ol>
+  </section>
+
+  <!-- PERFORMANCE -->
+  <section class="plate" id="performance" aria-labelledby="h-perf">
+    <div class="plate-head"><h2 id="h-perf">Performance</h2><span class="eyebrow">from <a href="https://github.com/fastipc/fastipc/blob/main/docs/perf/baseline.md">docs/perf/baseline.md</a></span></div>
+    <div class="perf">
+      <div class="chart" role="figure" aria-labelledby="chart-title">
+        <div class="chart-title">
+          <h3 id="chart-title">Messages per second, one sender and one receiver process</h3>
+          <div class="legend" aria-hidden="true"><span class="mach"><b>Intel Core i9 laptop</b><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span></span><span class="mach"><b>MacBook Air M1</b><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div>
+        </div>
+        <div class="bars">
+          <div class="grp"><div class="lbl">Zero-copy<small>16 B</small></div><div class="track">
+            <div class="bar lx" tabindex="0" data-tip="Zero-copy 16 B · Linux x86-64 57.47M/s"><span class="fill" style="width:calc((100% - 4.5em) * .958)"></span><b>57.5M</b></div>
+            <div class="bar wn" tabindex="0" data-tip="Zero-copy 16 B · Windows 47.91M/s"><span class="fill" style="width:calc((100% - 4.5em) * .798)"></span><b>47.9M</b></div>
+            <div class="bar mc" tabindex="0" data-tip="Zero-copy 16 B · macOS 56.22M/s"><span class="fill" style="width:calc((100% - 4.5em) * .937)"></span><b>56.2M</b></div>
+            <div class="bar la" tabindex="0" data-tip="Zero-copy 16 B · Linux ARM64 54.69M/s"><span class="fill" style="width:calc((100% - 4.5em) * 0.911)"></span><b>54.7M</b></div></div></div>
+          <div class="grp"><div class="lbl">Copy<small>16 B</small></div><div class="track">
+            <div class="bar lx" tabindex="0" data-tip="Copy 16 B · Linux x86-64 47.89M/s"><span class="fill" style="width:calc((100% - 4.5em) * .798)"></span><b>47.9M</b></div>
+            <div class="bar wn" tabindex="0" data-tip="Copy 16 B · Windows 48.25M/s"><span class="fill" style="width:calc((100% - 4.5em) * .804)"></span><b>48.2M</b></div>
+            <div class="bar mc" tabindex="0" data-tip="Copy 16 B · macOS 54.06M/s"><span class="fill" style="width:calc((100% - 4.5em) * .901)"></span><b>54.1M</b></div>
+            <div class="bar la" tabindex="0" data-tip="Copy 16 B · Linux ARM64 49.64M/s"><span class="fill" style="width:calc((100% - 4.5em) * 0.827)"></span><b>49.6M</b></div></div></div>
+          <div class="grp"><div class="lbl">RPC<small>16 B</small></div><div class="track">
+            <div class="bar lx" tabindex="0" data-tip="RPC 16 B · Linux x86-64 43.90M/s"><span class="fill" style="width:calc((100% - 4.5em) * .732)"></span><b>43.9M</b></div>
+            <div class="bar wn" tabindex="0" data-tip="RPC 16 B · Windows 44.03M/s"><span class="fill" style="width:calc((100% - 4.5em) * .734)"></span><b>44.0M</b></div>
+            <div class="bar mc" tabindex="0" data-tip="RPC 16 B · macOS 51.43M/s"><span class="fill" style="width:calc((100% - 4.5em) * .857)"></span><b>51.4M</b></div>
+            <div class="bar la" tabindex="0" data-tip="RPC 16 B · Linux ARM64 42.64M/s"><span class="fill" style="width:calc((100% - 4.5em) * 0.711)"></span><b>42.6M</b></div></div></div>
+          <div class="grp"><div class="lbl">Zero-copy<small>1 KiB</small></div><div class="track">
+            <div class="bar lx" tabindex="0" data-tip="Zero-copy 1 KiB · Linux x86-64 23.07M/s"><span class="fill" style="width:calc((100% - 4.5em) * .385)"></span><b>23.1M</b></div>
+            <div class="bar wn" tabindex="0" data-tip="Zero-copy 1 KiB · Windows 21.21M/s"><span class="fill" style="width:calc((100% - 4.5em) * .353)"></span><b>21.2M</b></div>
+            <div class="bar mc" tabindex="0" data-tip="Zero-copy 1 KiB · macOS 25.32M/s"><span class="fill" style="width:calc((100% - 4.5em) * .422)"></span><b>25.3M</b></div>
+            <div class="bar la" tabindex="0" data-tip="Zero-copy 1 KiB · Linux ARM64 21.81M/s"><span class="fill" style="width:calc((100% - 4.5em) * 0.363)"></span><b>21.8M</b></div></div></div>
+          <div class="grp"><div class="lbl">Copy<small>1 KiB</small></div><div class="track">
+            <div class="bar lx" tabindex="0" data-tip="Copy 1 KiB · Linux x86-64 21.45M/s"><span class="fill" style="width:calc((100% - 4.5em) * .357)"></span><b>21.4M</b></div>
+            <div class="bar wn" tabindex="0" data-tip="Copy 1 KiB · Windows 16.78M/s"><span class="fill" style="width:calc((100% - 4.5em) * .280)"></span><b>16.8M</b></div>
+            <div class="bar mc" tabindex="0" data-tip="Copy 1 KiB · macOS 26.99M/s"><span class="fill" style="width:calc((100% - 4.5em) * .450)"></span><b>27.0M</b></div>
+            <div class="bar la" tabindex="0" data-tip="Copy 1 KiB · Linux ARM64 26.09M/s"><span class="fill" style="width:calc((100% - 4.5em) * 0.435)"></span><b>26.1M</b></div></div></div>
+          <div class="grp"><div class="lbl">RPC<small>1 KiB</small></div><div class="track">
+            <div class="bar lx" tabindex="0" data-tip="RPC 1 KiB · Linux x86-64 17.75M/s"><span class="fill" style="width:calc((100% - 4.5em) * .296)"></span><b>17.8M</b></div>
+            <div class="bar wn" tabindex="0" data-tip="RPC 1 KiB · Windows 15.69M/s"><span class="fill" style="width:calc((100% - 4.5em) * .262)"></span><b>15.7M</b></div>
+            <div class="bar mc" tabindex="0" data-tip="RPC 1 KiB · macOS 25.86M/s"><span class="fill" style="width:calc((100% - 4.5em) * .431)"></span><b>25.9M</b></div>
+            <div class="bar la" tabindex="0" data-tip="RPC 1 KiB · Linux ARM64 25.33M/s"><span class="fill" style="width:calc((100% - 4.5em) * 0.422)"></span><b>25.3M</b></div></div></div>
+        </div>
+        <div class="axis" aria-hidden="true"><span></span><div class="ticks"><span>0</span><span>10M</span><span>20M</span><span>30M</span><span>40M</span><span>50M</span><span>60M</span></div></div>
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><span class="k">Round trip, p50</span><span class="v">237 ns<small>Linux x86-64</small></span><span class="v">263 ns<small>Windows</small></span><span class="v">167 ns<small>macOS</small></span><span class="v">208 ns<small>Linux ARM64</small></span><p>Ping-pong, both sides spinning; the peer's hold time subtracted. Each OS's fastest message size: 16 B, or 8 B on Windows. <a href="performance.html#latency">By size, and busy-polling</a></p></div>
+        <div class="tile"><span class="k">Large messages</span><span class="v">30 GiB/s<small>Linux x86-64</small></span><span class="v">26 GiB/s<small>Windows</small></span><span class="v">40 GiB/s<small>macOS</small></span><span class="v">39 GiB/s<small>Linux ARM64</small></span><p>64 KiB copied messages: 488K/s, 433K/s, 653K/s and 644K/s.</p></div>
+        <div class="tile"><span class="k">Connection setup and teardown</span><span class="v">2.6K/s<small>Linux x86-64</small></span><span class="v">7.4K/s<small>Windows</small></span><span class="v">3.5K/s<small>macOS</small></span><span class="v">2.3K/s<small>Linux ARM64</small></span><p>Listen, connect, accept, close both ends, stop listening: a 1 MiB ring each time.</p></div>
+      </div>
+    </div>
+    <p class="hwnote" style="margin-top:14px"><b>Intel Core i9-13900H</b> laptop, 6 P-cores (Hyper&#8209;Threading) and 8 E-cores, 32&nbsp;GB: Windows 11, and Linux in WSL2 (20 vCPUs).<br><b>Apple M1</b> MacBook Air, 4 P-cores and 4 E-cores, 8&nbsp;GB: macOS, and Linux in a VM (4 vCPUs, 4&nbsp;GB).<br>The two Linux series differ in the hardware, the two M1 series in the operating system. <a href="performance.html#machine">Machine and method</a></p>
+    <p class="note">Medians from the repository's benchmark suite (<code>bench/zig</code>): ReleaseFast builds, 512 KiB rings, no CPU pinning. <a href="performance.html">Full tables, the bindings, and how to read the noise</a>.</p>
+  </section>
+
+  <!-- QUICK START -->
+  <section class="plate" id="quickstart" aria-labelledby="h-qs">
+    <div class="plate-head"><h2 id="h-qs">Quick start</h2><span class="eyebrow">one exchange, every language</span></div>
+    <p class="intro">Each language has a server file and a client file: run the server in one process, then the client in another. Every pair makes the same exchange, an RPC request with opcode 1 and the payload <code>ping</code>, which the server answers in upper case, so any language's client works with any language's server (<a href="#interop">every pair is tested</a>).</p>
+    <div data-tabs="lang">
+      <div class="tabs" role="tablist" aria-label="Language">
+        <button type="button" role="tab" id="tab-zig" aria-controls="panel-zig" aria-selected="true">Zig</button>
+        <button type="button" role="tab" id="tab-c" aria-controls="panel-c" aria-selected="false">C</button>
+        <button type="button" role="tab" id="tab-cpp" aria-controls="panel-cpp" aria-selected="false">C++</button>
+        <button type="button" role="tab" id="tab-py" aria-controls="panel-py" aria-selected="false">Python</button>
+        <button type="button" role="tab" id="tab-cs" aria-controls="panel-cs" aria-selected="false">C#</button>
+        <button type="button" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="false">Java</button>
+        <button type="button" role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="false">Rust</button>
+        <button type="button" role="tab" id="tab-lua" aria-controls="panel-lua" aria-selected="false">Lua</button>
+        <button type="button" role="tab" id="tab-js" aria-controls="panel-js" aria-selected="false">JavaScript</button>
+        <button type="button" role="tab" id="tab-go" aria-controls="panel-go" aria-selected="false">Go</button>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-zig" aria-labelledby="tab-zig">
+        <div class="install"><span class="lang">Install</span><code>zig fetch --save git+https://github.com/fastipc/fastipc</code><button class="copy" type="button" data-copy="zig fetch --save git+https://github.com/fastipc/fastipc">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+pub fn main(init: std.process.Init) !void {
+    // rings of 1 MiB each way
+    const listener = try fastipc.Listener.listen(
+        init.io,
+        init.gpa,
+        "my_channel",
+        1 &lt;&lt; 20,
+    );
+    defer listener.close();
+    // waits for a client
+    const conn = try listener.accept(.none);
+    defer conn.close();
+
+    var buf: [256]u8 = undefined;
+    // .none: no timeout
+    const req = try conn.rpcRecv(&amp;buf, .none);
+    const reply = std.ascii.upperString(&amp;buf, req.payload);
+    try conn.rpcRespond(req.id, req.opcode, 0, reply, .none);
+}</code></pre></div>
+          <div class="code"><div class="label"><span>client.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+pub fn main(init: std.process.Init) !void {
+    const five_s: std.Io.Timeout = .{ .duration = .{
+        .raw = .fromSeconds(5),
+        .clock = .awake,
+    } };
+    const conn = try fastipc.Conn.connect(
+        init.io,
+        init.gpa,
+        "my_channel",
+        five_s,
+    );
+    defer conn.close();
+    _ = try conn.rpcSubmit(1, "ping", .none); // opcode 1
+    var buf: [256]u8 = undefined;
+    const response = try conn.rpcRecv(&amp;buf, .none);
+    std.debug.print("{s}\n", .{response.payload}); // PING
+}</code></pre></div>
+        </div>
+        <p class="note">Zig 0.17.0. Your <code>build.zig</code> imports the dependency's module: <code>exe.root_module.addImport("fastipc", dep.module("fastipc"))</code> (<a href="https://github.com/fastipc/fastipc/tree/main/examples/zig">an example project</a>). Errors are Zig error sets and timeouts <code>std.Io.Timeout</code> (<code>.none</code> waits as long as it takes). <a href="zig.html">More on the Zig module</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-c" aria-labelledby="tab-c" hidden>
+        <p class="note">The Zig build system builds the library and compiles your C, with no other build tool: link the dependency's artifact <code>fastipc</code> (<a href="https://github.com/fastipc/fastipc/tree/main/examples/c-cpp">an example project</a>). Any other compiler works with the release archives. <a href="c.html#build">Build and link</a>.</p>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.c</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">#include &lt;ctype.h&gt;
+#include &lt;fipc.h&gt;
+
+int main(void)
+{
+    fipc_listener_t* listener;
+    if (fipc_listen("my_channel", 1 &lt;&lt; 20, &amp;listener) != FIPC_OK) /* rings of 1 MiB each way */
+        return 1;
+    fipc_conn_t* conn;
+    if (fipc_accept(listener, &amp;conn, FIPC_FOREVER) == FIPC_OK) /* waits for a client */
+    {
+        char buf[256];
+        fipc_rpc_msg_t request;
+        if (fipc_rpc_recv(conn, buf, sizeof buf, &amp;request, FIPC_FOREVER) == FIPC_OK)
+        {
+            for (size_t i = 0; i &lt; request.len; i++)
+                buf[i] = (char) toupper((unsigned char) buf[i]);
+            fipc_rpc_respond(conn, request.id, request.opcode, 0, buf, request.len, FIPC_FOREVER);
+        }
+        fipc_close(conn);
+    }
+    fipc_listener_close(listener);
+    return 0;
+}</code></pre></div>
+          <div class="code"><div class="label"><span>client.c</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-c">#include &lt;fipc.h&gt;
+#include &lt;stdio.h&gt;
+
+int main(void)
+{
+    fipc_conn_t* conn;
+    fipc_result_t result = fipc_connect("my_channel", &amp;conn, 5000);
+    if (result != FIPC_OK)
+    {
+        fprintf(stderr, "connect: %s\n", fipc_result_str(result));
+        return 1;
+    }
+    uint64_t id;
+    char buf[256];
+    fipc_rpc_msg_t response;
+    if (fipc_rpc_submit(conn, 1, "ping", 4, &amp;id, FIPC_FOREVER) == FIPC_OK /* opcode 1 */
+        &amp;&amp; fipc_rpc_recv(conn, buf, sizeof buf, &amp;response, FIPC_FOREVER) == FIPC_OK)
+        printf("%.*s\n", (int) response.len, buf); /* PING */
+    fipc_close(conn);
+    return 0;
+}</code></pre></div>
+        </div>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-cpp" aria-labelledby="tab-cpp" hidden>
+        <p class="note">C++20 through the header-only <code>fipc.hpp</code>, built like C. Calls return <code>fipc::result&lt;T&gt;</code>: no exceptions needed. <a href="cpp.html">More on the C++ wrapper</a>.</p>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.cpp</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-cpp">#include &lt;cctype&gt;
+#include &lt;string&gt;
+
+#include &lt;fipc.hpp&gt;
+
+int main()
+{
+    auto listener = fipc::listener::listen("my_channel", 1 &lt;&lt; 20);  // rings of 1 MiB each way
+    if (!listener)
+        return 1;
+    auto conn = listener-&gt;accept();  // waits for a client
+    if (!conn)
+        return 1;
+    std::string payload;
+    auto request = conn-&gt;rpc_receive(payload);
+    if (!request)
+        return 1;
+    for (char&amp; c : payload)
+        c = static_cast&lt;char&gt;(std::toupper(static_cast&lt;unsigned char&gt;(c)));
+    return conn-&gt;rpc_respond(request-&gt;id, request-&gt;opcode, 0, payload) ? 0 : 1;
+}</code></pre></div>
+          <div class="code"><div class="label"><span>client.cpp</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-cpp">#include &lt;chrono&gt;
+#include &lt;cstdio&gt;
+#include &lt;string&gt;
+
+#include &lt;fipc.hpp&gt;
+
+int main()
+{
+    auto conn = fipc::connection::connect("my_channel", std::chrono::seconds(5));
+    if (!conn)
+    {
+        std::fprintf(stderr, "connect: %s\n", conn.error().name());
+        return 1;
+    }
+    std::string reply;
+    if (!conn-&gt;rpc_submit(1, "ping") || !conn-&gt;rpc_receive(reply))  // opcode 1
+        return 1;
+    std::printf("%s\n", reply.c_str());  // PING
+    return 0;
+}</code></pre></div>
+        </div>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-py" aria-labelledby="tab-py" hidden>
+        <div class="install"><span class="lang">Install</span><code>pip install fipc-python</code><button class="copy" type="button" data-copy="pip install fipc-python">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Listener
+
+# rings of 1 MiB each way
+with Listener("my_channel", 1 &lt;&lt; 20) as listener:
+    with listener.accept() as conn:  # waits for a client
+        request = conn.rpc_recv()
+        conn.rpc_respond(request.id, request.opcode,
+                         data=request.payload.upper())</code></pre></div>
+          <div class="code"><div class="label"><span>client.py</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-python">from fipc import Conn
+
+with Conn.connect("my_channel", timeout_ms=5000) as conn:
+    conn.rpc_submit(1, b"ping")     # opcode 1
+    print(conn.rpc_recv().payload)  # b'PING'</code></pre></div>
+        </div>
+        <p class="note">Calls block by default (<code>timeout_ms=FOREVER</code>) and raise <code>FipcError</code> for any result but OK. <a href="python.html">More on the Python binding</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-cs" aria-labelledby="tab-cs" hidden>
+        <div class="install"><span class="lang">Install</span><code>dotnet add package Fipc</code><button class="copy" type="button" data-copy="dotnet add package Fipc">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>Server/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// rings of 1 MiB each way
+FipcListener.Listen("my_channel", 1 &lt;&lt; 20,
+    out FipcListener? listener);
+using (listener)
+{
+    // waits for a client
+    listener!.Accept(out FipcConnection? conn, Fipc.Forever);
+    using (conn)
+    {
+        if (conn!.RpcReceive(out FipcRpcHeader request,
+                out byte[] payload, Fipc.Forever)
+            == FipcResult.Ok)
+        {
+            string upper = Encoding.UTF8.GetString(payload)
+                .ToUpperInvariant();
+            conn.RpcRespond(request.Id, request.Opcode, 0,
+                Encoding.UTF8.GetBytes(upper), Fipc.Forever);
+        }
+    }
+}</code></pre></div>
+          <div class="code"><div class="label"><span>Client/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+if (FipcConnection.Connect("my_channel",
+        out FipcConnection? conn, 5000) != FipcResult.Ok)
+    return 1;
+using (conn)
+{
+    conn!.RpcSubmit(opcode: 1, "ping"u8, out ulong id,
+        Fipc.Forever);
+    conn.RpcReceive(out FipcRpcHeader response,
+        out byte[] reply, Fipc.Forever);
+    Console.WriteLine(Encoding.UTF8.GetString(reply));  // PING
+}
+return 0;</code></pre></div>
+        </div>
+        <p class="note">Each is a console project (<code>dotnet new console</code>) with the <code>Fipc</code> package. Every call returns a <code>FipcResult</code>; a timeout or the peer's end is a result, not an exception. <a href="csharp.html">More on the C# binding</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-java" aria-labelledby="tab-java" hidden>
+        <div class="install"><span class="lang">Gradle</span><code class="coords">implementation("io.github.fastipc:fipc:1.0.0")</code><button class="copy" type="button" data-copy='implementation("io.github.fastipc:fipc:1.0.0")'>copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>Server.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.Connection;
+import io.github.fastipc.Listener;
+import io.github.fastipc.RpcMessage;
+
+public class Server {
+    public static void main(String[] args) {
+        // rings of 1 MiB each way; accept() waits for a client
+        try (Listener listener =
+                 Listener.listen("my_channel", 1 &lt;&lt; 20);
+             Connection conn = listener.accept()) {
+            RpcMessage request = conn.rpcReceive();
+            String text = new String(request.payload());
+            conn.rpcRespond(request.id(), request.opcode(), 0,
+                            text.toUpperCase().getBytes());
+        }
+    }
+}</code></pre></div>
+          <div class="code"><div class="label"><span>Client.java</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-java">import io.github.fastipc.Connection;
+import java.time.Duration;
+
+public class Client {
+    public static void main(String[] args) {
+        try (Connection conn = Connection.connect("my_channel",
+                 Duration.ofSeconds(5))) {
+            conn.rpcSubmit(1, "ping".getBytes());  // opcode 1
+            byte[] reply = conn.rpcReceive().payload();
+            System.out.println(new String(reply));  // PING
+        }
+    }
+}</code></pre></div>
+        </div>
+        <p class="note">Java 22+, through the FFM API. Run each with the jar on the class path: <code>java --enable-native-access=ALL-UNNAMED -cp fipc-1.0.0.jar Server.java</code>. Calls block by default and throw <code>FipcException</code> for any result but OK. <a href="java.html">More on the Java binding</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" hidden>
+        <div class="install"><span class="lang">Install</span><code>cargo add fipc</code><button class="copy" type="button" data-copy="cargo add fipc">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::Listener;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut listener = Listener::listen("my_channel", 1 &lt;&lt; 20)?; // rings of 1 MiB each way
+    let mut conn = listener.accept(None)?; // waits for a client
+    let request = conn.rpc_receive(None)?;
+    conn.rpc_respond(request.id, request.opcode, 0, &amp;request.payload.to_ascii_uppercase(), None)?;
+    Ok(())
+}</code></pre></div>
+          <div class="code"><div class="label"><span>client.rs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-rust">use fipc::Connection;
+use std::time::Duration;
+
+fn main() -&gt; fipc::Result&lt;()&gt; {
+    let mut conn = Connection::connect("my_channel", Duration::from_secs(5))?;
+    conn.rpc_submit(1, b"ping", None)?; // opcode 1
+    println!("{}", String::from_utf8_lossy(&amp;conn.rpc_receive(None)?.payload)); // PING
+    Ok(())
+}</code></pre></div>
+        </div>
+        <p class="note">Rust 1.85+. Calls return <code>Result&lt;T, Error&gt;</code>; a timeout (<code>None</code> waits as long as it takes) and the peer's end are errors to match on. <a href="rust.html">More on the Rust binding</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-lua" aria-labelledby="tab-lua" hidden>
+        <div class="install"><span class="lang">Install</span><code>luarocks install fipc</code><button class="copy" type="button" data-copy="luarocks install fipc">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local listener = assert(fipc.listen("my_channel", 1024 * 1024)) -- rings of 1 MiB each way
+local conn = assert(listener:accept()) -- waits for a client
+local request = assert(conn:rpc_recv())
+assert(conn:rpc_respond(request.id, request.opcode, 0, request.payload:upper()))
+conn:close()
+listener:close()</code></pre></div>
+          <div class="code"><div class="label"><span>client.lua</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-lua">local fipc = require("fipc")
+
+local conn = assert(fipc.connect("my_channel", 5000)) -- waits up to 5 s for the server
+assert(conn:rpc_submit(1, "ping")) -- opcode 1
+print(assert(conn:rpc_recv()).payload) -- PING
+conn:close()</code></pre></div>
+        </div>
+        <p class="note">LuaJIT 2.1, through its FFI: nothing to compile. A call that fails returns <code>nil</code> and the error's name (<code>"timeout"</code>, <code>"disconnected"</code>, ...), so <code>assert()</code> raises it; a timeout in milliseconds comes last, and none waits as long as it takes. <a href="lua.html">More on the Lua binding</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-js" aria-labelledby="tab-js" hidden>
+        <div class="install"><span class="lang">Install</span><code>npm install fipc</code><button class="copy" type="button" data-copy="npm install fipc">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Listener } from "fipc";
+
+const listener = Listener.listen("my_channel", 1 &lt;&lt; 20); // rings of 1 MiB each way
+const conn = await listener.accept(); // waits for a client; the event loop runs meanwhile
+const request = await conn.rpcReceive();
+await conn.rpcRespond(request.id, request.opcode, 0, request.payload.toString().toUpperCase());
+conn.close();
+listener.close();</code></pre></div>
+          <div class="code"><div class="label"><span>client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Connection } from "fipc";
+
+const conn = await Connection.connect("my_channel", 5000); // waits up to 5 s for the server
+await conn.rpcSubmit(1, "ping"); // opcode 1
+console.log((await conn.rpcReceive()).payload.toString()); // PING
+conn.close();</code></pre></div>
+        </div>
+        <p class="note">Node.js 22+, Bun and Deno 2, through one Node-API addon: nothing to compile. Calls that may wait return a Promise and leave the event loop running (a <code>Sync</code> form waits on the calling thread); a call that fails rejects with a <code>FipcError</code> whose <code>code</code> names the result (<code>"FIPC_TIMEOUT"</code>, ...). TypeScript types included. <a href="js.html">More on the JavaScript binding</a>.</p>
+      </div>
+
+      <div class="tabpanel" role="tabpanel" id="panel-go" aria-labelledby="tab-go" hidden>
+        <div class="install"><span class="lang">Install</span><code>go get github.com/fastipc/fastipc/bindings/go/fipc@latest</code><button class="copy" type="button" data-copy="go get github.com/fastipc/fastipc/bindings/go/fipc@latest">copy</button></div>
+        <div class="cols-2">
+          <div class="code"><div class="label"><span>server.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"bytes"
+	"log"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	listener, err := fipc.Listen("my_channel", 1&lt;&lt;20) // rings of 1 MiB each way
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.Close()
+	conn, err := listener.Accept(fipc.Forever) // waits for a client
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	request, err := conn.RPCReceive(fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = conn.RPCRespond(request.ID, request.Opcode, 0, bytes.ToUpper(request.Payload), fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+}</code></pre></div>
+          <div class="code"><div class="label"><span>client.go</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-go">package main
+
+import (
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/fastipc/fastipc/bindings/go/fipc"
+)
+
+func main() {
+	conn, err := fipc.Connect("my_channel", 5*time.Second) // waits up to 5 s for the server
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.RPCSubmit(1, []byte("ping"), fipc.Forever); err != nil { // opcode 1
+		log.Fatal(err)
+	}
+	reply, err := conn.RPCReceive(fipc.Forever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(reply.Payload)) // PING
+}</code></pre></div>
+        </div>
+        <p class="note">Go 1.27+, without cgo: the package loads the library through purego, its one dependency, so <code>CGO_ENABLED=0</code> builds and cross-compiling work. Every method is safe from any goroutine; errors are tested with <code>errors.Is</code> (<code>fipc.ErrTimeout</code>, <code>fipc.ErrDisconnected</code>, ...), and timeouts are <code>time.Duration</code>s (<code>fipc.Forever</code> waits as long as it takes). <a href="go.html">More on the Go binding</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- BINDINGS -->
+  <section class="plate" id="bindings" aria-labelledby="h-bind">
+    <div class="plate-head"><h2 id="h-bind">One library, ten languages</h2><span class="eyebrow">18 <code>fipc_*</code> functions, one ABI</span></div>
+    <div class="bindings">
+      <a class="bcard wide" href="zig.html">
+        <div class="top"><h3>Zig</h3><span class="pkg">module fastipc</span></div>
+        <p>The library's own language: <code>Listener</code> and <code>Conn</code> over your <code>std.Io</code>, with Zig error sets and <code>std.Io.Timeout</code>, compiled into your program. Plain and zero-copy messages; RPC is in the C API.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="c.html">
+        <div class="top"><h3>C</h3><span class="pkg">fipc.h</span></div>
+        <p>The whole API in one header: 18 functions, one struct, eight result codes. Built with the Zig build system or any C compiler.</p>
+        <span class="more">C API, zero-copy, RPC →</span>
+      </a>
+      <a class="bcard" href="cpp.html">
+        <div class="top"><h3>C++</h3><span class="pkg">fipc.hpp</span></div>
+        <p>A header-only C++20 wrapper: RAII listeners and connections, <code>fipc::result&lt;T&gt;</code> without exceptions, <code>std::chrono</code> timeouts, zero-copy slots.</p>
+        <span class="more">Build, examples →</span>
+      </a>
+      <a class="bcard" href="python.html">
+        <div class="top"><h3>Python</h3><span class="pkg">fipc</span></div>
+        <p><code>Listener</code> and <code>Conn</code> over CFFI's ABI mode: no compiler needed. Results other than OK raise <code>FipcError</code>.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="csharp.html">
+        <div class="top"><h3>C#</h3><span class="pkg">Fipc</span></div>
+        <p><code>FipcListener</code> and <code>FipcConnection</code> on SafeHandles, safe to dispose from any thread, over a raw P/Invoke layer, <code>Fipc</code>.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="java.html">
+        <div class="top"><h3>Java</h3><span class="pkg">fipc</span></div>
+        <p><code>Listener</code> and <code>Connection</code> over the FFM API, Java 22+: no JNI. Safe to close from any thread; failures throw <code>FipcException</code>.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="rust.html">
+        <div class="top"><h3>Rust</h3><span class="pkg">fipc</span></div>
+        <p><code>Listener</code> and <code>Connection</code>, safe and <code>Send + Sync</code>, over a raw FFI crate. The borrow checker keeps the threading and zero-copy rules; errors are a <code>Result</code>.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="lua.html">
+        <div class="top"><h3>Lua</h3><span class="pkg">fipc</span></div>
+        <p>One module over LuaJIT's FFI: no compiler, no C module. Listeners and connections with plain, zero-copy and RPC messages; a failed call returns <code>nil</code> and the error's name.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="js.html">
+        <div class="top"><h3>JavaScript</h3><span class="pkg">fipc</span></div>
+        <p>One Node-API addon for Node.js, Bun and Deno: <code>Listener</code> and <code>Connection</code>, Promises that never block the event loop and <code>Sync</code> calls, zero-copy views that detach when they end, TypeScript types.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+      <a class="bcard" href="go.html">
+        <div class="top"><h3>Go</h3><span class="pkg">fipc</span></div>
+        <p>One package without cgo, through purego: <code>Listener</code> and <code>Conn</code>, safe from any goroutine as a <code>net.Conn</code> is, errors for <code>errors.Is</code>, <code>time.Duration</code> timeouts, cancel from a <code>context</code>.</p>
+        <span class="more">Install, examples →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- PLATFORMS -->
+  <section class="plate" id="platforms" aria-labelledby="h-plat">
+    <div class="plate-head"><h2 id="h-plat">Platform support</h2><span class="eyebrow">from <a href="https://github.com/fastipc/fastipc/blob/main/docs/platform-support.md">docs/platform-support.md</a></span></div>
+    <p class="intro">Modern systems only. Without old systems to carry, the code uses modern APIs and instructions directly, with no fallbacks or feature probes.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col"></th><th scope="col">Supported</th><th scope="col">What it means</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">CPU</th><td>x86-64 with <b>x86-64-v3</b> (AVX2, BMI1/2, FMA, MOVBE) on Linux and Windows; <b>ARM64</b> (ARMv8.0-A) on Linux; <b>Apple Silicon</b> on macOS</td><td>Intel Haswell (2013) and later, AMD Zen (2017) and later; Raspberry Pi 3/4/5, AWS Graviton, Ampere, NVIDIA Jetson; Apple M1 and later</td></tr>
+          <tr><th scope="row">Linux</th><td><b>glibc 2.34</b> or newer, x86-64 and ARM64</td><td>Ubuntu 22.04, Debian 12, RHEL 9 and later (kernels 5.14+)</td></tr>
+          <tr><th scope="row">Windows</th><td><b>Windows 11</b>, Windows Server 2022 and later, x64</td><td>Windows 10 left support in October 2025</td></tr>
+          <tr><th scope="row">macOS</th><td><b>macOS 14.4</b> or newer, on Apple Silicon</td><td>the first with <code>os_sync_wait_on_address</code>; the dylib is ad hoc signed, not notarized</td></tr>
+          <tr><th scope="row">Build</th><td><b>Zig 0.17.0</b></td><td>Only to build from source; the Python, NuGet, Maven, crates.io, LuaRocks and npm packages and the Go module carry the native library</td></tr>
+          <tr class="sep"><th scope="row">Not supported</th><td colspan="2" class="muted">32-bit systems, Windows on ARM, Intel Macs, musl-based Linux, x86-64 CPUs without AVX2</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/docs/protocol.md">Protocol</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

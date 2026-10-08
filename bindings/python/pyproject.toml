@@ -1,0 +1,46 @@
+# The PyPI package fipc-python: the import package fipc with the native library bundled in fipc/_native/.
+# `python devtool.py package python` builds the wheels (one per platform, tagged by setup.py); building from this
+# folder by hand gives a pure wheel without the library, which finds one in a checkout's zig-out or on the system's
+# search path.
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fipc-python"
+dynamic = ["version"]
+description = "Shared-memory IPC for Python: messages and RPC between two processes on one machine (FastIPC)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Hayden Donnelly" }]
+requires-python = ">=3.9"
+dependencies = ["cffi>=1.15.0"]
+keywords = ["ipc", "shared-memory", "interprocess-communication", "rpc", "zero-copy", "messaging"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Networking",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://fastipc.github.io/fastipc/"
+Repository = "https://github.com/fastipc/fastipc"
+Documentation = "https://fastipc.github.io/fastipc/python.html"
+Issues = "https://github.com/fastipc/fastipc/issues"
+
+[tool.setuptools]
+packages = ["fipc"]
+
+[tool.setuptools.dynamic]
+version = { attr = "fipc.__version__" }
+
+[tool.setuptools.package-data]
+fipc = ["py.typed", "_native/fastipc.dll", "_native/libfastipc.so", "_native/libfastipc.dylib"]

@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for Zig: shared-memory IPC module</title>
+<meta name="description" content="Shared-memory IPC in Zig: FastIPC&#x27;s native module, Listener and Conn over your own std.Io, messages and RPC between two processes, for Zig 0.17.0.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/zig.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for Zig: shared-memory IPC module">
+<meta property="og:description" content="Shared-memory IPC in Zig: FastIPC&#x27;s native module, Listener and Conn over your own std.Io, messages and RPC between two processes, for Zig 0.17.0.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/zig.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for Zig: shared-memory IPC module">
+<meta name="twitter:description" content="Shared-memory IPC in Zig: FastIPC&#x27;s native module, Listener and Conn over your own std.Io, messages and RPC between two processes, for Zig 0.17.0.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html" aria-current="page">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">module fastipc · src/zig/root.zig · Zig 0.17.0</span>
+    <h1>Zig</h1>
+    <p class="lede">The library is written in Zig, and its package exports the module <code>fastipc</code>: <code>Listener</code> and <code>Conn</code> over your own <code>std.Io</code>, with Zig error sets in place of result codes and <code>std.Io.Timeout</code> in place of milliseconds. It is the same implementation as the C API, compiled into your program, so there is no shared library to ship.</p>
+    <div class="install" style="max-width:620px"><span class="lang">Zig</span><code>zig fetch --save git+https://github.com/fastipc/fastipc</code><button class="copy" type="button" data-copy="zig fetch --save git+https://github.com/fastipc/fastipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#install">Install</a><a href="#hello">Server and client</a><a href="#rules">The rules</a><a href="#messages">Messages</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#threads">Threads and Io</a><a href="#rpc">RPC</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="install" aria-labelledby="h-install">
+    <div class="plate-head"><h2 id="h-install">Install and build</h2><span class="eyebrow">Zig 0.17.0 · x86-64-v3 · ARM64 Linux · Apple Silicon</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>zig fetch --save</code> adds the package to your <code>build.zig.zon</code> as <code>fipc</code>; for a checkout of your own, list it by path instead: <code>.fipc = .{ .path = "../fastipc" }</code>. Your <code>build.zig</code> then imports the dependency's module <code>fastipc</code> into each program that uses it.</p>
+        <p>The module is the library's own source (<a href="index.html#small">small enough to read</a>), built with your target and optimize mode. It links libc and the system libraries it needs, which the package's build adds. It needs Zig 0.17.0 and runs where the library does: x86-64-v3 CPUs, Linux with glibc 2.34+ (x86-64 and ARM64), Windows 11 and Server 2022+, and macOS 14.4+ on Apple Silicon (<a href="index.html#platforms">platform support</a>).</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>build.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const dep = b.dependency("fipc", .{
+    .target = target,
+    .optimize = optimize,
+});
+exe.root_module.addImport("fastipc", dep.module("fastipc"));</code></pre></div>
+        <div class="code"><div class="label"><span>build.zig.zon, from a checkout</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">.dependencies = .{
+    .fipc = .{ .path = "../fastipc" },
+},</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Each file is a program of its own, an executable in your <code>build.zig</code>; these two are the repository's <a href="https://github.com/fastipc/fastipc/tree/main/examples/zig">examples/zig</a>, a project that builds them. Start the two in either order: <code>Conn.connect</code> waits up to its timeout for a server to listen and accept. The client sends an RPC request with opcode 1 and the payload <code>ping</code>, and the server answers in upper case: the exchange every example on this site makes, so either program works with the other half in any language (<a href="index.html#interop">every pair of languages is tested</a>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+pub fn main(init: std.process.Init) !void {
+    // rings of 1 MiB each way
+    const listener = try fastipc.Listener.listen(
+        init.io,
+        init.gpa,
+        "my_channel",
+        1 &lt;&lt; 20,
+    );
+    defer listener.close();
+    // waits for a client
+    const conn = try listener.accept(.none);
+    defer conn.close();
+
+    var buf: [256]u8 = undefined;
+    // .none: no timeout
+    const req = try conn.rpcRecv(&amp;buf, .none);
+    const reply = std.ascii.upperString(&amp;buf, req.payload);
+    try conn.rpcRespond(req.id, req.opcode, 0, reply, .none);
+}</code></pre></div>
+      <div class="code"><div class="label"><span>client.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+pub fn main(init: std.process.Init) !void {
+    const five_s: std.Io.Timeout = .{ .duration = .{
+        .raw = .fromSeconds(5),
+        .clock = .awake,
+    } };
+    const conn = try fastipc.Conn.connect(
+        init.io,
+        init.gpa,
+        "my_channel",
+        five_s,
+    );
+    defer conn.close();
+    _ = try conn.rpcSubmit(1, "ping", .none); // opcode 1
+    var buf: [256]u8 = undefined;
+    const response = try conn.rpcRecv(&amp;buf, .none);
+    std.debug.print("{s}\n", .{response.payload}); // PING
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rules" aria-labelledby="h-rules">
+    <div class="plate-head"><h2 id="h-rules">The rules</h2><span class="eyebrow">the C API's, in Zig terms</span></div>
+    <div class="features">
+      <div class="feature"><span class="tag">std.Io.Timeout</span><h3>Timeouts</h3><p>Always the last parameter. <code>.none</code> waits as long as it takes, a zero <code>.duration</code> doesn't wait, and a <code>.deadline</code> is a point in time. A call that runs out returns <code>error.Timeout</code> having changed nothing.</p></div>
+      <div class="feature"><span class="tag">name · capacity</span><h3>Names and rings</h3><p>A name is 1 to 245 characters of <code>[A-Za-z0-9_.-]</code>, not starting with <code>.</code> or <code>-</code>, local to the user (Linux, macOS) or the desktop session (Windows). The server picks the ring size: a power of two from 1 KiB to 2 GiB.</p></div>
+      <div class="feature"><span class="tag">threads</span><h3>One sender, one receiver</h3><p>On a connection, one thread at a time sends and one receives, and the two may run at once. <code>cancel</code> works from any thread; no call may overlap <code>close</code>. To stop a waiting thread: cancel, join it, then close.</p></div>
+      <div class="feature"><span class="tag">any size</span><h3>Messages</h3><p>A message holds at least one byte and arrives in order. <code>send</code> and <code>recv</code> take any size; a long message travels in pieces and is delivered whole or not at all.</p></div>
+      <div class="feature"><span class="tag">error.TooLarge</span><h3>Buffers too small</h3><p>A <code>recv</code> or <code>rpcRecv</code> into a buffer that is too small takes nothing: the message stays queued. <code>recvAlloc</code> and <code>rpcRecvAlloc</code> take it at any size, into memory they allocate for exactly its length.</p></div>
+      <div class="feature"><span class="tag">error.Disconnected</span><h3>The peer's end</h3><p>Final for that connection: sends return it at once, receives after every completed message, and <code>ended()</code> turns true. Close the connection, then accept or connect a new one.</p></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro"><code>send</code> takes a message of any size and sends it in pieces of up to <code>maxPiece()</code> bytes when it is longer; its timeout bounds the wait for room for the first piece, and a started message completes unless a cancel or the peer's end stops it, which drops it whole. <code>recv</code> fills your buffer and returns the length; <code>recvAlloc</code> returns a new slice that you free. This server echoes every message back until its client leaves, which ends its next receive with <code>error.Disconnected</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+pub fn main(init: std.process.Init) !void {
+    // rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+    const listener = try fastipc.Listener.listen(
+        init.io,
+        init.gpa,
+        "demo",
+        1 &lt;&lt; 20,
+    );
+    defer listener.close();
+    // waits for a client
+    const conn = try listener.accept(.none);
+    defer conn.close();
+    while (true) {
+        // a message of any size, in memory from gpa
+        const message = conn.recvAlloc(
+            init.gpa,
+            .none,
+        ) catch |err| switch (err) {
+            error.Disconnected =&gt; break, // the client left
+            else =&gt; return err,
+        };
+        defer init.gpa.free(message);
+        try conn.send(message, .none); // echo it
+    }
+    std.debug.print("client gone\n", .{});
+}</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+pub fn main(init: std.process.Init) !void {
+    const five_s: std.Io.Timeout = .{ .duration = .{
+        .raw = .fromSeconds(5),
+        .clock = .awake,
+    } };
+    const conn = try fastipc.Conn.connect(
+        init.io,
+        init.gpa,
+        "demo",
+        five_s,
+    );
+    defer conn.close();
+    var buf: [64]u8 = undefined;
+    for ([_][]const u8{ "hello", "shared", "memory" }) |word| {
+        try conn.send(word, .none);
+        const len = try conn.recv(&amp;buf, five_s);
+        std.debug.print("{s}\n", .{buf[0..len]});
+    }
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">error sets for fipc_result_t</span></div>
+    <p class="intro">Each error has the name of the C result code it stands for (<a href="c.html#results">the codes</a>). <code>listen</code> and <code>accept</code> return <code>fastipc.ListenError</code>, <code>connect</code> returns <code>fastipc.Error</code>, and the data and RPC calls return <code>fastipc.DataError</code>; <code>recvAlloc</code> and <code>rpcRecvAlloc</code> add <code>std.mem.Allocator.Error</code>.</p>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Error</th><th scope="col">C code</th><th scope="col">Returned by</th><th scope="col">Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>error.Timeout</code></td><td><code>FIPC_TIMEOUT</code></td><td>every call that waits</td><td>The timeout ran out; with a zero duration, there was nothing to do without waiting.</td></tr>
+          <tr><td><code>error.Disconnected</code></td><td><code>FIPC_DISCONNECTED</code></td><td>the data and RPC calls</td><td>The peer closed the connection or its process ended.</td></tr>
+          <tr><td><code>error.Cancelled</code></td><td><code>FIPC_CANCELLED</code></td><td>every call that waits</td><td>The handle's <code>cancel</code> was called, and the call would have had to wait. A data call that your <code>Io</code> cancels returns it too.</td></tr>
+          <tr><td><code>error.TooLarge</code></td><td><code>FIPC_TOO_LARGE</code></td><td><code>recv</code>, <code>rpcRecv</code>, <code>acquire</code>, <code>recvAcquire</code></td><td>The message (an RPC message's payload) doesn't fit the buffer, or one piece for zero-copy. A message being received stays queued, for <code>recvAlloc</code> or <code>rpcRecvAlloc</code> to take at any size.</td></tr>
+          <tr><td><code>error.Invalid</code></td><td><code>FIPC_INVALID</code></td><td>any call</td><td>A bad argument, a call out of order (an accept while the last client's connection is open), a peer of another version or user, corrupt ring content, a message that isn't an RPC message received by <code>rpcRecv</code> (dropped).</td></tr>
+          <tr><td><code>error.NoMemory</code></td><td><code>FIPC_NO_MEMORY</code></td><td><code>listen</code>, <code>accept</code>, <code>connect</code></td><td>Memory or another OS resource ran out while setting a connection up.</td></tr>
+          <tr><td><code>error.AddrInUse</code></td><td><code>FIPC_ADDR_IN_USE</code></td><td><code>listen</code></td><td>Another listener holds the name.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cols" style="margin-top:16px">
+      <div class="code"><div class="label"><span>timeouts</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const Timeout = std.Io.Timeout;
+const forever: Timeout = .none;
+const no_wait: Timeout = .{ .duration = .{
+    .raw = .zero,
+    .clock = .awake,
+} };
+const five_s: Timeout = .{ .duration = .{
+    .raw = .fromSeconds(5),
+    .clock = .awake,
+} };
+const this_frame: Timeout = .{ .deadline = .fromNow(io, .{
+    .raw = .fromMilliseconds(16),
+    .clock = .awake,
+}) };</code></pre></div>
+      <div class="code"><div class="label"><span>wait at most 100 ms</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const hundred_ms: std.Io.Timeout = .{ .duration = .{
+    .raw = .fromMilliseconds(100),
+    .clock = .awake,
+} };
+var buf: [4096]u8 = undefined;
+if (conn.recv(&amp;buf, hundred_ms)) |len| {
+    handle(buf[0..len]);
+} else |err| switch (err) {
+    error.Timeout =&gt; {}, // nothing yet
+    else =&gt; return err, // error.Disconnected: the peer is gone
+}</code></pre></div>
+    </div>
+    <p class="note" style="margin-top:12px">The data and RPC calls (<code>send</code>, <code>recv</code>, <code>recvAlloc</code>, <code>acquire</code>, <code>recvAcquire</code>, <code>rpcSubmit</code>, <code>rpcRespond</code>, <code>rpcRecv</code>, <code>rpcRecvAlloc</code>) wait in whole milliseconds and round a timeout up to the next one.</p>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">messages of one piece: up to conn.maxPiece() bytes</span></div>
+    <p class="intro"><code>acquire</code> returns room in the ring as a <code>[]u8</code>; write the message there and <code>commit</code> the bytes you wrote, at least one. <code>recvAcquire</code> returns the next message where it lies, as a <code>[]const u8</code> that stays valid until <code>release</code>, the next receive or <code>close</code>. <code>maxPiece()</code> is the ring's capacity less 64 bytes. A longer message goes through <code>send</code>, and <code>recvAcquire</code> returns <code>error.TooLarge</code> for a message of several pieces, which stays queued for <code>recv</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const out = try conn.acquire(64, .none); // room in the ring
+const text = try std.mem.print(out, "tick {d}", .{tick});
+try conn.commit(text.len); // publishes text.len bytes</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">// the next message, read-only, in the ring
+const message = try conn.recvAcquire(.none);
+handle(message);
+conn.release(); // frees its room</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads and your Io</h2><span class="eyebrow">std.Io.Threaded · cancel</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>accept</code> and <code>connect</code> set a connection up on the thread that calls them, so a client and its server run on different threads or processes. Then every connection runs a task on the <code>Io</code> you pass, which watches the peer. That <code>Io</code> must run concurrent tasks, as <code>std.Io.Threaded</code> does; the <code>Io</code> that <code>std.process.Init</code> hands to <code>main</code> is one. Don't cancel the library's tasks through it.</p>
+        <p><code>Listener</code> and <code>Conn</code> are handles, copied by value. To stop a thread that waits, call <code>cancel()</code> from any thread: every call of that handle that would wait, then or later, returns <code>error.Cancelled</code>, and calls that needn't wait still work. Then join the thread and close. The waits of <code>accept</code> and <code>connect</code> are the OS's, not your <code>Io</code>'s: <code>cancel()</code> ends an accept, a timeout bounds a connect. When your <code>Io</code> cancels a task that waits in a data call, the call returns <code>error.Cancelled</code> and the cancelation stays pending for the task's next cancelation point.</p>
+      </div>
+      <div class="code"><div class="label"><span>stop a reader thread</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const Reader = struct {
+    fn run(c: fastipc.Conn) void {
+        var buf: [4096]u8 = undefined;
+        // until error.Cancelled (or error.Disconnected)
+        while (c.recv(&amp;buf, .none)) |len| {
+            handle(buf[0..len]);
+        } else |_| {}
+    }
+};
+const reader = try std.Thread.spawn(.{}, Reader.run, .{conn});
+// ...
+conn.cancel(); // wakes the reader: error.Cancelled
+reader.join();
+conn.close();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">RpcMessage { id, kind, opcode, status, payload }</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status. Either side may submit. <code>rpcSubmit</code> returns the request's id. <code>rpcRecv</code> fills your buffer and returns an <code>RpcMessage</code> whose <code>payload</code> is the part it filled, with no allocation per message; <code>rpcRecvAlloc</code> takes a payload of any size into memory from your allocator, which you free. A message that isn't an RPC message is dropped, with <code>error.Invalid</code>. Use a connection for RPC or for plain messages, not both. This server answers requests until its client leaves, and this client checks what came back; either makes the exchange above with the other half in any language.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>rpc_server.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+const upper: u32 = 1; // the opcode
+
+pub fn main(init: std.process.Init) !void {
+    const listener = try fastipc.Listener.listen(
+        init.io,
+        init.gpa,
+        "my_channel",
+        1 &lt;&lt; 20,
+    );
+    defer listener.close();
+    const conn = try listener.accept(.none);
+    defer conn.close();
+    while (true) {
+        // a payload of any size, in memory from gpa
+        const req = conn.rpcRecvAlloc(
+            init.gpa,
+            .none,
+        ) catch |err| switch (err) {
+            error.Disconnected =&gt; return, // the client left
+            else =&gt; return err,
+        };
+        defer init.gpa.free(req.payload);
+        // requests with this opcode only
+        if (req.kind != .request or req.opcode != upper)
+            continue;
+        for (req.payload) |*c| c.* = std.ascii.toUpper(c.*);
+        try conn.rpcRespond(
+            req.id,
+            req.opcode,
+            0, // the status
+            req.payload,
+            .none,
+        );
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>rpc_client.zig</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-zig">const std = @import("std");
+const fastipc = @import("fastipc");
+
+const upper: u32 = 1; // the opcode
+
+pub fn main(init: std.process.Init) !void {
+    const five_s: std.Io.Timeout = .{ .duration = .{
+        .raw = .fromSeconds(5),
+        .clock = .awake,
+    } };
+    const conn = try fastipc.Conn.connect(
+        init.io,
+        init.gpa,
+        "my_channel",
+        five_s,
+    );
+    defer conn.close();
+    const id = try conn.rpcSubmit(upper, "ping", .none);
+    var buf: [256]u8 = undefined;
+    const reply = try conn.rpcRecv(&amp;buf, five_s);
+    std.debug.assert(reply.kind == .response);
+    std.debug.assert(reply.id == id);
+    std.debug.print("{d} {s}\n", .{
+        reply.status,
+        reply.payload,
+    }); // 0 PING
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow"><a href="https://github.com/fastipc/fastipc/blob/main/src/zig/root.zig">src/zig/root.zig</a></span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>Listener.listen(io, gpa, name, capacity)</code></td><td>Claims the name and listens on it with rings of <code>capacity</code> bytes. Doesn't wait. <code>error.AddrInUse</code> if another listener holds the name.</td></tr>
+          <tr><td><code>listener.accept(timeout)</code></td><td>Waits for a client, sets its connection up on the calling thread and returns its <code>Conn</code>. One client at a time: close it before the next accept. A zero timeout polls.</td></tr>
+          <tr><td><code>listener.cancel()</code></td><td>Every accept that waits, now or later, returns <code>error.Cancelled</code>, dropping a client whose setup began. Any thread.</td></tr>
+          <tr><td><code>listener.close()</code></td><td>Stops listening and frees the listener; the connections it accepted stay open.</td></tr>
+          <tr class="sep"><td><code>Conn.connect(io, gpa, name, timeout)</code></td><td>Connects to the server listening on the name, waiting up to the timeout for it to listen and accept.</td></tr>
+          <tr><td><code>conn.send(message, timeout)</code></td><td>Sends one message of any size, in pieces if needed.</td></tr>
+          <tr><td><code>conn.recv(buf, timeout)</code></td><td>Receives the next message into <code>buf</code> and returns its length; <code>error.TooLarge</code> if it doesn't fit (it stays queued).</td></tr>
+          <tr><td><code>conn.recvAlloc(gpa, timeout)</code></td><td>Receives the next message into memory from <code>gpa</code>, which you free.</td></tr>
+          <tr><td><code>conn.rpcSubmit(opcode, payload, timeout)</code></td><td>Sends a request and returns its id: the connection's next, never 0.</td></tr>
+          <tr><td><code>conn.rpcRespond(id, opcode, status, payload, timeout)</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>conn.rpcRecv(buf, timeout)</code></td><td>Receives the next request or response, its payload into <code>buf</code>, and returns it as an <code>RpcMessage</code>; <code>error.TooLarge</code> if the payload doesn't fit (it stays queued), <code>error.Invalid</code> for a message that isn't RPC (dropped).</td></tr>
+          <tr><td><code>conn.rpcRecvAlloc(gpa, timeout)</code></td><td>Receives the next request or response, its payload into memory from <code>gpa</code>, which you free.</td></tr>
+          <tr><td><code>conn.acquire(len, timeout)</code> · <code>conn.commit(len)</code></td><td>Zero-copy send: room for <code>len</code> bytes in the ring · sends the first <code>len</code> bytes written there as one message.</td></tr>
+          <tr><td><code>conn.recvAcquire(timeout)</code> · <code>conn.release()</code></td><td>Zero-copy receive: the next message in place · frees its room.</td></tr>
+          <tr><td><code>conn.maxPiece()</code></td><td>The longest message the zero-copy calls take: the capacity less 64 bytes.</td></tr>
+          <tr><td><code>conn.cancel()</code></td><td>Every call of the connection that would wait, now or later, returns <code>error.Cancelled</code>. Any thread.</td></tr>
+          <tr><td><code>conn.ended()</code></td><td>Whether the peer ended the session; its calls report <code>error.Disconnected</code> once nothing is left to receive.</td></tr>
+          <tr><td><code>conn.close()</code></td><td>Ends the connection (the peer's calls report <code>error.Disconnected</code>), unmaps its rings and frees it. No other thread may be inside a call on it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/src/zig/root.zig">root.zig</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

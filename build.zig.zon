@@ -1,0 +1,15 @@
+.{
+    .name = .fipc,
+    .version = "1.0.0",
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        // Vendored (vendor/README.md): no build downloads anything.
+        .translate_c = .{
+            .path = "vendor/translate_c",
+        },
+    },
+    // What a build that depends on this package needs (build.zig builds only the library and the module then): no
+    // tests, benchmarks, bindings or website
+    .paths = .{ "build.zig", "build.zig.zon", "src", "include", "vendor", "LICENSE", "README.md" },
+    .fingerprint = 0x838bce788016f897,
+}

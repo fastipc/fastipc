@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)</title>
+<meta name="description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages and RPC that never block the event loop, and TypeScript types.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/js.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)">
+<meta property="og:description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages and RPC that never block the event loop, and TypeScript types.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/js.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)">
+<meta name="twitter:description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages and RPC that never block the event loop, and TypeScript types.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html" aria-current="page">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">fipc on npm · import { Listener, Connection } from "fipc"</span>
+    <h1>JavaScript</h1>
+    <p class="lede">One Node-API addon for Node.js 22+, Bun and Deno 2: <code>Listener.listen</code> and <code>Connection.connect</code> give listeners and connections with plain, zero-copy and RPC messages. Every call that may wait returns a Promise and leaves the event loop running; a <code>Sync</code> form waits on the calling thread. A call the library refuses fails with a <code>FipcError</code> whose <code>code</code> names the result. TypeScript types included; nothing is compiled when you install it. The package carries the addon and the native library for Windows x64, Linux x64 and ARM64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon.</p>
+    <div class="install" style="max-width:620px"><span class="lang">npm</span><code>npm install fipc</code><button class="copy" type="button" data-copy="npm install fipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Plain messages</a><a href="#async">Async and Sync</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#interop">Any language</a><a href="#lifetimes">Lifetimes and workers</a><a href="#setup">Node.js, Bun, Deno</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals (<code>node server.mjs</code>, <code>node client.mjs</code>; <code>bun</code> and <code>deno run -A</code> run them as they are): <code>Connection.connect</code> waits up to its timeout, in milliseconds, for a server to listen and accept; a call without a timeout waits as long as it takes. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Listener } from "fipc";
+
+const listener = Listener.listen("my_channel", 1 &lt;&lt; 20); // rings of 1 MiB each way
+const conn = await listener.accept(); // waits for a client; the event loop runs meanwhile
+const request = await conn.rpcReceive();
+await conn.rpcRespond(request.id, request.opcode, 0, request.payload.toString().toUpperCase());
+conn.close();
+listener.close();</code></pre></div>
+      <div class="code"><div class="label"><span>client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Connection } from "fipc";
+
+const conn = await Connection.connect("my_channel", 5000); // waits up to 5 s for the server
+await conn.rpcSubmit(1, "ping"); // opcode 1
+console.log((await conn.rpcReceive()).payload.toString()); // PING
+conn.close();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>send</code> takes a message of any size, a string (sent as UTF-8), a <code>Buffer</code> or any <code>TypedArray</code>, a <code>DataView</code> or an <code>ArrayBuffer</code>, and <code>receive</code> resolves to each one whole, as a new <code>Buffer</code>. A message longer than the ring travels in pieces and arrives whole. This server echoes every message back until its client leaves, which ends its next <code>receive</code> with <code>FIPC_DISCONNECTED</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Listener } from "fipc";
+
+// rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+const listener = Listener.listen("demo", 1 &lt;&lt; 20);
+const conn = await listener.accept(); // waits for a client
+for (;;) {
+  let message;
+  try {
+    message = await conn.receive();
+  } catch (error) {
+    if (error.code === "FIPC_DISCONNECTED") break; // the client is gone
+    throw error;
+  }
+  await conn.send(message); // echo, any size
+}
+console.log("client gone");
+conn.close();
+listener.close();</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Connection } from "fipc";
+
+const conn = await Connection.connect("demo", 5000);
+for (const word of ["hello", "shared", "memory"]) {
+  await conn.send(word);
+  console.log((await conn.receive()).toString());
+}
+conn.close();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="async" aria-labelledby="h-async">
+    <div class="plate-head"><h2 id="h-async">Async and Sync calls</h2><span class="eyebrow">the event loop keeps running</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>A plain call (<code>accept</code>, <code>connect</code>, <code>send</code>, <code>receive</code>, <code>rpcReceive</code>, ...) returns a Promise. It makes the call at once when it needn't wait (a message is there, the ring has room), which costs no more than the Promise; otherwise a thread of the connection's own, one per direction (a listener has one for accepting), waits in the library and settles the promise. libuv's thread pool is never used, so files, DNS and crypto never wait behind FastIPC, and no number of waiting calls starves it.</p>
+        <p>Calls of one direction run in the order they were made, so sends needn't be awaited one by one. Don't change a buffer you passed to <code>send</code>, or read one you passed to <code>receiveInto</code>, until its promise settles, and don't resize or transfer its ArrayBuffer meanwhile: the call uses the memory in place.</p>
+        <p>The <code>Sync</code> form (<code>acceptSync</code>, <code>connectSync</code>, <code>sendSync</code>, <code>receiveSync</code>, ...) waits on the calling thread and blocks the event loop meanwhile: the fastest way to make many calls in a tight loop or in a <code>Worker</code>, and with <code>NO_WAIT</code> a way to poll. While an async call of a direction is pending, a <code>Sync</code> call of that direction fails with <code>ERR_FIPC_BUSY</code>.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>a receive that waits, and a timer that keeps firing</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const timer = setInterval(() =&gt; console.log("the event loop runs"), 100);
+const message = await conn.receive(); // waits without blocking the timer
+clearInterval(timer);</code></pre></div>
+        <div class="code"><div class="label"><span>polling once a frame, with the Sync calls</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">// once a frame: take what has arrived, without waiting
+for (;;) {
+  let message;
+  try {
+    message = conn.receiveSync(NO_WAIT);
+  } catch (error) {
+    if (error.code === "FIPC_TIMEOUT") break; // nothing more this frame
+    throw error; // "FIPC_DISCONNECTED": the peer is gone
+  }
+  handle(message);
+}</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">FipcError, its code</span></div>
+    <p class="intro">A call the library refuses rejects (in the <code>Sync</code> form, throws) a <code>FipcError</code>: its <code>code</code> is <code>"FIPC_TIMEOUT"</code>, <code>"FIPC_DISCONNECTED"</code>, <code>"FIPC_CANCELLED"</code>, <code>"FIPC_TOO_LARGE"</code>, <code>"FIPC_INVALID"</code>, <code>"FIPC_NO_MEMORY"</code> or <code>"FIPC_ADDR_IN_USE"</code>, the C API's results (<code>result</code> is the number, <code>call</code> the method). A misuse is a <code>TypeError</code> or <code>RangeError</code>, or an <code>Error</code> with the code <code>ERR_FIPC_CLOSED</code> (a closed handle) or <code>ERR_FIPC_BUSY</code>. The timeout comes last, in milliseconds: <code>NO_WAIT</code> (0) doesn't wait, leaving it out (or <code>FOREVER</code>) waits as long as it takes. <code>FIPC_DISCONNECTED</code> is final: close the connection, then accept or connect a new one.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>wait at most 100 ms</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">try {
+  handle(await conn.receive(100)); // waits at most 100 ms
+} catch (error) {
+  if (error.code !== "FIPC_TIMEOUT") throw error; // "FIPC_DISCONNECTED": the peer is gone
+}</code></pre></div>
+      <div class="code"><div class="label"><span>a buffer of your own: FIPC_TOO_LARGE says how much room</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">let buffer = Buffer.alloc(4096);
+let length;
+try {
+  length = await conn.receiveInto(buffer);
+} catch (error) {
+  if (error.code !== "FIPC_TOO_LARGE") throw error;
+  buffer = Buffer.alloc(error.length); // the message stays queued: make room, then take it
+  length = await conn.receiveInto(buffer);
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.maxPiece bytes</span></div>
+    <p class="intro">Write a message into the ring and commit it; read one in the ring and release it. <code>sendAcquire</code> resolves to a <code>Uint8Array</code> over room in the ring; <code>sendCommit</code> publishes its first bytes (all, or fewer). <code>receiveAcquire</code> resolves to a <code>Uint8Array</code> over the message, valid until <code>receiveRelease</code>, the next receive or <code>close</code>. When the bytes stop being valid the view is detached, its length 0, so a stale view can never touch the ring; one that can still be reached keeps its connection open. A message of several pieces fails with <code>FIPC_TOO_LARGE</code> and stays queued for <code>receive</code>. Making a view costs more than copying a short message, so in JavaScript zero-copy pays off for long ones.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const slot = await conn.sendAcquire(5); // room in the ring: a Uint8Array
+slot.set(Buffer.from("hello"));
+conn.sendCommit(5); // sent; the view is detached</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const view = await conn.receiveAcquire(); // the message in the ring
+handle(view); // read it in place
+conn.receiveRelease(); // frees its room; view.length is 0 from now on</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">{ id, kind, opcode, status, payload }</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status (an int32). Either side may submit. <code>rpcReceive</code> resolves to an object with the payload as a <code>Buffer</code>; <code>rpcReceiveInto(buffer)</code> puts the payload in your buffer and resolves to the object with <code>length</code> in its place. A payload may be empty (left out). Ids are numbers, from 1, increasing (a <code>bigint</code> is taken too). Several requests may be in flight; correlate the responses by id. Use a connection for RPC or for plain messages, not both.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>rpc_server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Listener, RPC_REQUEST } from "fipc";
+
+const UPPER = 1;
+
+const listener = Listener.listen("my_channel", 1 &lt;&lt; 20);
+const conn = await listener.accept();
+for (;;) {
+  let request;
+  try {
+    request = await conn.rpcReceive();
+  } catch (error) {
+    if (error.code === "FIPC_DISCONNECTED") break;
+    throw error;
+  }
+  if (request.kind === RPC_REQUEST &amp;&amp; request.opcode === UPPER) {
+    await conn.rpcRespond(request.id, request.opcode, 0, request.payload.toString().toUpperCase());
+  }
+}
+conn.close();
+listener.close();</code></pre></div>
+      <div class="code"><div class="label"><span>rpc_client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { Connection, RPC_RESPONSE } from "fipc";
+
+const UPPER = 1;
+
+const conn = await Connection.connect("my_channel", 5000);
+const words = ["ping", "shared", "memory"];
+// three requests in flight at once; the server answers them in order
+const ids = await Promise.all(words.map((word) =&gt; conn.rpcSubmit(UPPER, word)));
+for (const id of ids) {
+  const reply = await conn.rpcReceive();
+  console.log(reply.kind === RPC_RESPONSE &amp;&amp; reply.id === id, reply.payload.toString()); // true PING, ...
+}
+conn.close();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol</span></div>
+    <p class="intro">The <code>server.mjs</code> and <code>client.mjs</code> above work with a peer in any of the ten languages: <a href="index.html#interop">every pair of languages is tested</a>. A Node.js process can hand CPU-heavy work to a worker written in Rust, C++ or Python, or serve as the front end of a native engine, without a socket.</p>
+  </section>
+
+  <section class="plate" id="lifetimes" aria-labelledby="h-life">
+    <div class="plate-head"><h2 id="h-life">Lifetimes and worker threads</h2><span class="eyebrow">close, cancel, the garbage collector</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>conn.cancel()</code> makes every call of the connection that waits, then or later, fail with <code>FIPC_CANCELLED</code>. <code>conn.close()</code> ends the connection: pending calls fail with <code>FIPC_CANCELLED</code>, every view is detached, and the peer gets <code>FIPC_DISCONNECTED</code> once it has received what this side sent. <code>listener.close()</code> stops listening and leaves the connections it accepted open. Both work with <code>using</code> (<code>Symbol.dispose</code>).</p>
+        <p>A listener or connection the program drops is closed when the garbage collector finalizes it; those still open when a worker thread or the process ends are closed then. An idle connection doesn't keep the process alive; a pending call does, until it settles, as a socket would.</p>
+      </div>
+      <div class="stack">
+        <p>A listener or connection belongs to the JavaScript thread that made it, the main thread or a <code>Worker</code>: each worker opens connections of its own. A client and its server may even run in one process, since <code>await listener.accept()</code> and <code>await Connection.connect(name)</code> each wait on a thread of their own. There is no heartbeat and no timeout: a paused or hung peer is not reported, a crashed or killed one as soon as its process has ended.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="setup" aria-labelledby="h-setup">
+    <div class="plate-head"><h2 id="h-setup">Node.js, Bun and Deno</h2><span class="eyebrow">Node-API 8 · x86-64-v3 · ARM64 Linux · Apple Silicon</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>The binding is one Node-API addon, the interface all three runtimes load, so one package serves them: Node.js 22 or newer, Bun, and Deno 2 (which needs <code>--allow-ffi</code> to load an addon, and <code>--allow-read</code> and <code>--allow-env</code> for the binding to find it). The package carries the addon and the native library for every platform in <code>prebuilds/</code>, picks the right one when it loads, and runs no install script. Types come with it, for <code>import</code> and for <code>require</code>.</p>
+        <p>The binding looks for its addon and the library in the folder <code>FASTIPC_LIB_DIR</code> names, then (in a checkout of the repository) its <code>zig-out</code> build, then the package's <code>prebuilds/&lt;platform&gt;-&lt;arch&gt;/</code>, and for the library last, the system's search. <code>fipc.library</code> and <code>fipc.addon</code> say which files it loaded; the library stays loaded until the process ends.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>run the client in each runtime</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash">node client.mjs
+bun client.mjs
+deno run --allow-ffi --allow-read --allow-env client.mjs</code></pre></div>
+        <div class="code"><div class="label"><span>CommonJS</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const { Listener, Connection } = require("fipc");</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow"><a href="https://github.com/fastipc/fastipc/blob/main/bindings/js/index.d.ts">index.d.ts</a></span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>Listener.listen(name, capacity)</code></td><td>Claims the name and listens: a listener; <code>FIPC_ADDR_IN_USE</code> if another listener holds it.</td></tr>
+          <tr><td><code>listener.accept(timeout)</code> · <code>acceptSync(timeout)</code></td><td>Sets the next client's connection up: a <code>Connection</code>. One client at a time: close it before the next accept. <code>acceptSync(NO_WAIT)</code> polls.</td></tr>
+          <tr><td><code>listener.cancel()</code> · <code>close()</code> · <code>name</code> · <code>closed</code></td><td>Cancel waiting accepts · stop listening; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>Connection.connect(name, timeout)</code> · <code>connectSync</code></td><td>Connects to the server listening on the name, waiting for it to listen and accept.</td></tr>
+          <tr><td><code>conn.send(data, timeout)</code> · <code>sendSync</code></td><td>Sends one message of any size: a string, a TypedArray, a DataView or an ArrayBuffer.</td></tr>
+          <tr><td><code>conn.receive(timeout)</code> · <code>receiveSync</code></td><td>Receives one message of any size, as a new <code>Buffer</code>.</td></tr>
+          <tr><td><code>conn.receiveInto(buffer, timeout)</code> · <code>receiveIntoSync</code></td><td>Receives into your buffer; its length. <code>FIPC_TOO_LARGE</code> (with <code>error.length</code>) if it doesn't fit.</td></tr>
+          <tr><td><code>conn.sendAcquire(length, timeout)</code> · <code>sendAcquireSync</code> · <code>sendCommit(length)</code></td><td>Zero-copy send: a <code>Uint8Array</code> over the ring, then publish.</td></tr>
+          <tr><td><code>conn.receiveAcquire(timeout)</code> · <code>receiveAcquireSync</code> · <code>receiveRelease()</code></td><td>Zero-copy receive: a <code>Uint8Array</code> over the message, then free its room.</td></tr>
+          <tr><td><code>conn.rpcSubmit(opcode, data, timeout)</code> · <code>rpcSubmitSync</code></td><td>Sends a request; its id.</td></tr>
+          <tr><td><code>conn.rpcRespond(id, opcode, status, data, timeout)</code> · <code>rpcRespondSync</code></td><td>Sends the response to request <code>id</code>.</td></tr>
+          <tr><td><code>conn.rpcReceive(timeout)</code> · <code>rpcReceiveInto(buffer, timeout)</code> (and <code>Sync</code>)</td><td>Receives one request or response: <code>{ id, kind, opcode, status, payload }</code> · the payload in your buffer and <code>length</code> in the object.</td></tr>
+          <tr><td><code>conn.maxPiece</code> · <code>ended</code> · <code>closed</code> · <code>cancel()</code> · <code>close()</code></td><td>The zero-copy limit · whether a call failed with <code>FIPC_DISCONNECTED</code> · whether it is closed · cancel waiting calls · end the connection.</td></tr>
+          <tr class="sep"><td><code>NO_WAIT</code> · <code>FOREVER</code> · <code>RPC_REQUEST</code> · <code>RPC_RESPONSE</code></td><td>0 · -1 · 1 · 2.</td></tr>
+          <tr><td><code>FipcError</code> · <code>Result</code> · <code>resultStr(result)</code></td><td>The error (<code>code</code>, <code>result</code>, <code>call</code>, <code>length</code>) · the results by name · the C name of one.</td></tr>
+          <tr><td><code>library</code> · <code>addon</code> · <code>version</code></td><td>The paths of the library and the addon loaded · <code>"1.0.0"</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding on Node.js 22, copied 16-byte messages run at 2.6 to 3.3 million per second between two processes through the async calls and about twice that through the <code>Sync</code> calls, RPC requests at 1.8 to 2.3 million, 64 KiB messages at about 300,000 per second; an RPC round trip takes about 2 microseconds at the median (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>

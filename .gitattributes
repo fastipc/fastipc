@@ -1,0 +1,33 @@
+# Normalize line endings across platforms
+* text=auto eol=lf
+
+# Explicit LF for common text files
+*.sh  text eol=lf
+*.c   text eol=lf
+*.h   text eol=lf
+*.zig text eol=lf
+*.py  text eol=lf
+*.md  text eol=lf
+*.cs  text eol=lf
+
+# Treat zig build files and JSON as text
+*.json text eol=lf
+*.toml text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+
+# Java and Gradle: the wrapper scripts keep their platforms' line endings; the wrapper jar is binary
+*.java    text eol=lf
+*.kts     text eol=lf
+gradlew   text eol=lf
+*.bat     text eol=crlf
+*.jar     binary
+
+# Rust
+*.rs      text eol=lf
+Cargo.lock text eol=lf
+
+# Lua
+*.lua      text eol=lf
+*.rockspec text eol=lf

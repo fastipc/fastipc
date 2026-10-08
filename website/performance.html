@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC performance: shared-memory IPC throughput and latency</title>
+<meta name="description" content="Measured throughput, latency and connection setup of FastIPC&#x27;s shared-memory IPC and of its C#, Java, Python, Rust, Lua, JavaScript and Go bindings, with the machine and method.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/performance.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC performance: shared-memory IPC throughput and latency">
+<meta property="og:description" content="Measured throughput, latency and connection setup of FastIPC&#x27;s shared-memory IPC and of its C#, Java, Python, Rust, Lua, JavaScript and Go bindings, with the machine and method.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/performance.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC performance: shared-memory IPC throughput and latency">
+<meta name="twitter:description" content="Measured throughput, latency and connection setup of FastIPC&#x27;s shared-memory IPC and of its C#, Java, Python, Rust, Lua, JavaScript and Go bindings, with the machine and method.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html" aria-current="page">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">docs/perf/baseline.md · docs/perf/bindings-baseline.md</span>
+    <h1>Performance</h1>
+    <p class="lede">Every number here comes from the repository's benchmark suites, run on one laptop (the macOS and Linux VM columns on a MacBook Air): two processes, one sending and one receiving, connected through the public API. Linux numbers are WSL2 on the same machine as Windows', and Linux in a VM on the MacBook. Treat them as a guide to the shape of the costs; your hardware will differ.</p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#library">The library</a><a href="#m1">On the M1</a><a href="#latency">Latency</a><a href="#reading">Reading the numbers</a><a href="#bindings">By language</a><a href="#machine">Machine and method</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="library" aria-labelledby="h-lib">
+    <div class="plate-head"><h2 id="h-lib">The library</h2><span class="eyebrow">bench/zig · 2026-10-07</span></div>
+    <p class="intro">Linux (WSL2) and Windows: medians of an A/B run (5 alternating rounds of 0.3 s per gated case), ReleaseFast for x86-64-v3. macOS* and the Linux VM: the same A/B with 1 s per case, 2026-10-07, ReleaseFast for Apple M1 and for generic ARMv8.0-A. All with the stream pace. Messages per second; the round trip's p50; connection cycles per second. 512 KiB rings, except 1.5 MiB messages, which span three rings and travel in pieces.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">Scenario</th><th scope="col" class="calls">Calls</th><th scope="col" class="case">Case</th><th scope="col" class="n">Linux (WSL2)</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM on the M1&dagger;</th></tr></thead>
+        <tbody>
+          <tr><td>Copy</td><td class="calls"><code>fipc_send</code> / <code>fipc_recv</code></td><td class="case">16 B</td><td class="n">47.89M</td><td class="n">48.25M</td><td class="n">54.06M</td><td class="n">49.64M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">64 B</td><td class="n">46.12M</td><td class="n">40.83M</td><td class="n">49.89M</td><td class="n">53.92M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">1 KiB</td><td class="n">21.45M</td><td class="n">16.78M</td><td class="n">26.99M</td><td class="n">26.09M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">64 KiB</td><td class="n">487.6K</td><td class="n">432.8K</td><td class="n">652.9K</td><td class="n">643.5K</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">1.5 MiB</td><td class="n">9.8K</td><td class="n">8.8K</td><td class="n">14.0K</td><td class="n">14.1K</td></tr>
+          <tr class="sep"><td>Zero-copy</td><td class="calls"><code>_acquire</code> / <code>_commit</code> · <code>_release</code></td><td class="case">16 B</td><td class="n">57.47M</td><td class="n">47.91M</td><td class="n">56.22M</td><td class="n">54.69M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">64 B</td><td class="n">51.95M</td><td class="n">47.94M</td><td class="n">49.05M</td><td class="n">41.26M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">1 KiB</td><td class="n">23.07M</td><td class="n">21.21M</td><td class="n">25.32M</td><td class="n">21.81M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">64 KiB</td><td class="n">484.7K</td><td class="n">442.4K</td><td class="n">433.5K</td><td class="n">542.5K</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">1.5 MiB</td><td class="n">9.6K</td><td class="n">8.7K</td><td class="n">14.3K</td><td class="n">14.2K</td></tr>
+          <tr class="sep"><td>RPC</td><td class="calls"><code>fipc_rpc_submit</code> / <code>_recv</code></td><td class="case">16 B</td><td class="n">43.90M</td><td class="n">44.03M</td><td class="n">51.43M</td><td class="n">42.64M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">64 B</td><td class="n">32.90M</td><td class="n">33.46M</td><td class="n">48.15M</td><td class="n">39.60M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">1 KiB</td><td class="n">17.75M</td><td class="n">15.69M</td><td class="n">25.86M</td><td class="n">25.33M</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">64 KiB</td><td class="n">476.2K</td><td class="n">431.6K</td><td class="n">649.4K</td><td class="n">648.6K</td></tr>
+          <tr><td></td><td class="calls"></td><td class="case">1.5 MiB</td><td class="n">9.8K</td><td class="n">8.8K</td><td class="n">13.2K</td><td class="n">14.1K</td></tr>
+          <tr class="sep"><td>Round trip</td><td class="calls">peer replies at once, both spinning</td><td class="case">32 B, p50</td><td class="n">254 ns</td><td class="n">282 ns</td><td class="n">167 ns</td><td class="n">212 ns</td></tr>
+          <tr><td></td><td class="calls"><a href="#latency">by size, below</a></td><td class="case">fastest, p50</td><td class="n">237 ns (16 B)</td><td class="n">263 ns (8 B)</td><td class="n">167 ns (16 B)</td><td class="n">208 ns (16 B)</td></tr>
+          <tr class="sep"><td>Setup</td><td class="calls">listen, connect, accept, close both, stop</td><td class="case">1 MiB ring</td><td class="n">2.6K/s</td><td class="n">7.4K/s</td><td class="n">3.5K/s</td><td class="n">2.3K/s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hwnote"><b>Not all on the same hardware:</b> Linux (WSL2) and Windows ran on one Intel Core i9-13900H laptop, the *&nbsp;macOS column on a MacBook Air M1, and the &dagger;&nbsp;Linux VM column in a virtual machine on that MacBook (4 vCPUs, 4&nbsp;GB), so compare across columns with care. <a href="#machine">Machine and method</a></p>
+  </section>
+
+  <section class="plate" id="m1" aria-labelledby="h-m1">
+    <div class="plate-head"><h2 id="h-m1">On the M1: macOS and Linux</h2><span class="eyebrow">before and after the stream pace · 2026-10-06</span></div>
+    <p class="intro">The MacBook Air M1 under macOS and under Linux in a VM on it, with the library before the stream pace and with it (after; <a href="#reading">Reading the numbers</a>), the build of 2026-10-06, before a later change that the library table's M1 columns include: 3 rounds alternating between the two libraries, each round <code>fipc_bench all --runs 5</code>; the median of the 15 runs. The ranges of the rounds are in <a href="https://github.com/fastipc/fastipc/blob/main/docs/perf/baseline.md">baseline.md</a>. The VM column compares with Linux (WSL2) above for the hardware, with macOS for the operating system.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th scope="col" rowspan="2">Scenario</th><th scope="col" rowspan="2" class="case">Case</th><th scope="colgroup" colspan="2" class="n">macOS*</th><th scope="colgroup" colspan="2" class="n">Linux VM on the M1&dagger;</th></tr>
+          <tr><th scope="col" class="n">before</th><th scope="col" class="n">after</th><th scope="col" class="n">before</th><th scope="col" class="n">after</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Copy</td><td class="case">64 B</td><td class="n">44.02M</td><td class="n">44.45M</td><td class="n">50.65M</td><td class="n">50.56M</td></tr>
+          <tr><td></td><td class="case">256 B</td><td class="n">30.20M</td><td class="n">55.29M</td><td class="n">25.20M</td><td class="n">49.28M</td></tr>
+          <tr><td></td><td class="case">1 KiB</td><td class="n">8.15M</td><td class="n">27.26M</td><td class="n">6.95M</td><td class="n">24.90M</td></tr>
+          <tr><td></td><td class="case">64 KiB</td><td class="n">646.5K</td><td class="n">654.4K</td><td class="n">598.2K</td><td class="n">592.2K</td></tr>
+          <tr><td></td><td class="case">1.5 MiB</td><td class="n">18.0K</td><td class="n">13.8K</td><td class="n">17.9K</td><td class="n">16.6K</td></tr>
+          <tr class="sep"><td>Zero-copy</td><td class="case">64 B</td><td class="n">59.17M</td><td class="n">62.63M</td><td class="n">38.58M</td><td class="n">37.64M</td></tr>
+          <tr><td></td><td class="case">256 B</td><td class="n">27.21M</td><td class="n">50.72M</td><td class="n">26.22M</td><td class="n">26.54M</td></tr>
+          <tr><td></td><td class="case">1 KiB</td><td class="n">7.85M</td><td class="n">25.47M</td><td class="n">19.63M</td><td class="n">20.58M</td></tr>
+          <tr><td></td><td class="case">64 KiB</td><td class="n">437.6K</td><td class="n">432.2K</td><td class="n">534.8K</td><td class="n">505.6K</td></tr>
+          <tr><td></td><td class="case">1.5 MiB</td><td class="n">14.8K</td><td class="n">13.1K</td><td class="n">15.2K</td><td class="n">16.4K</td></tr>
+          <tr class="sep"><td>RPC</td><td class="case">64 B</td><td class="n">43.96M</td><td class="n">47.37M</td><td class="n">38.05M</td><td class="n">34.96M</td></tr>
+          <tr><td></td><td class="case">256 B</td><td class="n">35.28M</td><td class="n">53.22M</td><td class="n">41.66M</td><td class="n">46.35M</td></tr>
+          <tr><td></td><td class="case">1 KiB</td><td class="n">7.92M</td><td class="n">25.85M</td><td class="n">6.55M</td><td class="n">25.14M</td></tr>
+          <tr><td></td><td class="case">64 KiB</td><td class="n">655.6K</td><td class="n">635.2K</td><td class="n">653.1K</td><td class="n">630.8K</td></tr>
+          <tr><td></td><td class="case">1.5 MiB</td><td class="n">14.1K</td><td class="n">16.3K</td><td class="n">15.0K</td><td class="n">15.1K</td></tr>
+          <tr class="sep"><td>Round trip, p50</td><td class="case">32 B</td><td class="n">167&nbsp;ns</td><td class="n">167&nbsp;ns</td><td class="n">208&nbsp;ns</td><td class="n">208&nbsp;ns</td></tr>
+          <tr><td>Wake a sleeper, p50</td><td class="case">32 B</td><td class="n">26.2&nbsp;µs</td><td class="n">26.2&nbsp;µs</td><td class="n">35.3&nbsp;µs</td><td class="n">34.2&nbsp;µs</td></tr>
+          <tr><td>Wake a sleeper, p99</td><td class="case">32 B</td><td class="n">33.9&nbsp;µs</td><td class="n">33.3&nbsp;µs</td><td class="n">52.8&nbsp;µs</td><td class="n">50.5&nbsp;µs</td></tr>
+          <tr><td>Sleep round trip, p99</td><td class="case">32 B</td><td class="n">40.7&nbsp;µs</td><td class="n">40.5&nbsp;µs</td><td class="n">54.2&nbsp;µs</td><td class="n">64.3&nbsp;µs</td></tr>
+          <tr class="sep"><td>Setup</td><td class="case">1 MiB ring</td><td class="n">3.6K/s</td><td class="n">3.6K/s</td><td class="n">2.5K/s</td><td class="n">2.6K/s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Messages per second unless the row says otherwise. 1.5&nbsp;MiB is bimodal on the M1: a run lands near 13 to 14K or near 17 to 18K with either library, so its medians move by up to a quarter between sessions; a re-check over 8 rounds put copy within 3% and zero-copy 15% lower with the pace, the rounds overlapping: a cost there is possible and not established. In the VM, the sleeping round trip's p99 is 15 to 24% higher in every paced build, pace 2 as much as 256 (paired against pace 1 in two sessions of 14 rounds: 66 and 74&nbsp;µs against 79 to 89), its p50 and p999 unchanged. Neither side of that case is ever paced, so it is the paced code being compiled in, not the pace; macOS shows none. Not explained beyond that.</p>
+  </section>
+
+  <section class="plate" id="latency" aria-labelledby="h-lat">
+    <div class="plate-head"><h2 id="h-lat">Latency</h2><span class="eyebrow">latency-spin · wakeup-poll · 2026-10-07</span></div>
+    <p class="intro">A round trip between two processes, both sides spinning, by message size: the medians of 7 interleaved rounds of 1 s of samples each, ReleaseFast for x86-64-v3, 512 KiB rings, the peer's hold time subtracted. A frame in the ring is the message plus a 16-byte header, aligned to 16 bytes: 8 and 16 B messages make 32-byte frames, which never straddle a 64-byte cache line, and 48 B makes 64-byte frames; 32 B makes 48-byte frames, half of which straddle one, and 64 B 80-byte frames, which always span two.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">Message</th><th scope="col" class="n">Linux (WSL2) p50</th><th scope="col" class="n">p99</th><th scope="col" class="n">Windows p50</th><th scope="col" class="n">p99</th></tr></thead>
+        <tbody>
+          <tr><td>8 B</td><td class="n">240 ns</td><td class="n">334 ns</td><td class="n">263 ns</td><td class="n">351 ns</td></tr>
+          <tr><td>16 B</td><td class="n">237 ns</td><td class="n">298 ns</td><td class="n">264 ns</td><td class="n">331 ns</td></tr>
+          <tr><td>32 B</td><td class="n">270 ns</td><td class="n">361 ns</td><td class="n">280 ns</td><td class="n">386 ns</td></tr>
+          <tr><td>48 B</td><td class="n">240 ns</td><td class="n">314 ns</td><td class="n">266 ns</td><td class="n">341 ns</td></tr>
+          <tr><td>64 B</td><td class="n">296 ns</td><td class="n">377 ns</td><td class="n">318 ns</td><td class="n">426 ns</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Unpinned: the two processes on separate cores, as two processes that each do work run. Pinned to two separate P-cores, Windows measures the same, whether the cores are neighbours or not.</p>
+    <div class="stack" style="margin-top:22px">
+    <h3 id="busy-polling">Lowest latency: busy-polling</h3>
+    <p>A receiver that waits in <code>fipc_recv</code> spins for 100 to 250&nbsp;µs, then sleeps; a message that comes later wakes it in tens of microseconds. For the lowest latency at any message rate, poll instead: call <code>fipc_recv</code> (or <code>fipc_rpc_recv</code>, <code>fipc_recv_acquire</code>, or a binding's receive) with timeout 0 in a loop, and call again on <code>FIPC_TIMEOUT</code>. A call that finds nothing makes no system call and reads no clock: it looks at the ring's indices and the connection's state and returns, in about 20&nbsp;ns. The polling thread holds one core at 100%.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">One 32 B message per millisecond, its age on arrival</th><th scope="col" class="n">Linux (WSL2) p50</th><th scope="col" class="n">p99</th><th scope="col" class="n">Windows p50</th><th scope="col" class="n">p99</th></tr></thead>
+        <tbody>
+          <tr><td>Receiver waits in <code>fipc_recv</code> (<code>wakeup</code>)</td><td class="n">55.4 µs</td><td class="n">136 µs</td><td class="n">42.3 µs</td><td class="n">513 µs</td></tr>
+          <tr><td>Receiver polls with timeout 0 (<code>wakeup-poll</code>)</td><td class="n">257 ns</td><td class="n">70.8 µs</td><td class="n">268 ns</td><td class="n">17.7 µs</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Unpinned, 2026-10-07. On the M1 a polling receiver gets the message in 125&nbsp;ns under macOS and 167&nbsp;ns in the Linux VM (<a href="#m1">above</a>). The p99 is the operating system's: interrupts and the scheduler take the polling core away for 1 to 2% of the time in gaps over a microsecond, and a message sent during one waits for the thread to run again.</p>
+    </div>
+  </section>
+
+  <section class="plate" id="reading" aria-labelledby="h-read">
+    <div class="plate-head"><h2 id="h-read">Reading the numbers</h2><span class="eyebrow">what the docs say about them</span></div>
+    <div class="features">
+      <div class="feature"><span class="tag">16–256 B, copy vs zero-copy</span><h3>The receiver sets the pace</h3><p>Short copied messages cost about as much per message as zero-copy ones. But the copying benchmark's receiver keeps up with its sender, so every publish would wait about 50 ns for cache lines to return from the reader's core. A receiver that waits for a stream therefore holds back its first looks (64 pauses on Windows, 32 on Linux, 256 on Apple Silicon), which lifts copy and RPC at 16 to 64 B 1.4 to 2.4 times; one that waits for an answer looks at once. The pace is a build option: <code>zig build -Dstream_pace=N</code> builds another for other hardware. A receiver that does real work on its messages runs in the faster regime.</p></div>
+      <div class="feature"><span class="tag">ARM64, 256 B–1.5 KiB</span><h3>Don't poll a stream too eagerly</h3><p>A receiver that had caught up with a stream used to look at the ring after every spin hint, and on the M1 that held 1&nbsp;KiB messages at about 8M per second. Measured: such a receiver caught up at most messages and slowed its sender, so it stayed caught up. Inferred, not measured: each look takes the 128-byte cache line of the ring's indices from the sender, which must win it back for its next message. A receiver that only receives now waits about 2&nbsp;µs before its next look on ARM64: 1&nbsp;KiB runs at 25 to 27M per second under macOS and Linux, and the round trip's p50 is unchanged, because a side waiting for an answer still looks after every hint.</p></div>
+      <div class="feature"><span class="tag">noise</span><h3>How much runs differ</h3><p>From 1 KiB up, two runs of the same library agree within 2 to 3%. At 16 to 64 B they differ by up to 4% on Windows and 9% on WSL. The round trip's p50 holds within 1% (on WSL a round's lands near 240 or near 270 ns, so compare many rounds), setup within 1%.</p></div>
+      <div class="feature"><span class="tag">latency-sleep · wakeup</span><h3>Waking a sleeper</h3><p>When the receiver has gone to sleep, a message reaches it in about 35 to 45 µs on Windows (some runs near 100 µs), 50 to 65 µs on WSL and 26 µs on macOS, depending on how deeply its core slept. A waiting side spins for 100 to 250 µs before it sleeps.</p></div>
+      <div class="feature"><span class="tag">64 KiB and up</span><h3>Bandwidth</h3><p>At 64 KiB the copy runs at 30 GiB/s on Linux and 26 GiB/s on Windows. Messages longer than the ring go in pieces, and copy, zero-copy and RPC then run alike.</p></div>
+      <div class="feature"><span class="tag">Windows throttling · macOS background</span><h3>Quality of service</h3><p>The suite turns Windows power throttling off for its processes, and devtool for every process the other languages' benchmarks start. Started from a background process otherwise, Windows 11 runs them on efficiency cores: 64 KiB messages fall to 210 to 280K per second. macOS has its counterpart, the background state, which runs a process and its children on the M1's efficiency cores (copy 1&nbsp;KiB at 7M per second instead of 27M); devtool and the suite leave it, and warn of a background QoS clamp they can't lift.</p></div>
+    </div>
+  </section>
+
+  <section class="plate" id="bindings" aria-labelledby="h-bind">
+    <div class="plate-head"><h2 id="h-bind">By language</h2><span class="eyebrow">bench/zig · bench/c · bench/csharp · bench/java · bench/python · bench/rust · bench/lua · bench/js · bench/go</span></div>
+    <p class="intro">Reference medians of Zig (the library's own suite, method below its table), the C and C++ (one harness, the same loops through <code>fipc.h</code> and through <code>fipc.hpp</code>, built ReleaseFast by <code>zig build</code>), C# (.NET 9, through the raw layer <code>Fipc</code>), Java (JDK 25), Python, Rust (through the safe API), Lua (LuaJIT 2.1 through the binding), JavaScript (Node.js 22 through the binding's async calls, each awaited) and Go (Go 1.27 through the binding, without cgo) benchmarks, release builds, 5 runs round-robin (Linux and Windows 2026-10-07), messages per second. Each case is timed after an untimed warm-up of at least 0.2&nbsp;s (0.5&nbsp;s on the JITs: C#, Java, LuaJIT, Node.js), from a start marker the client sends after it. The 16 to 256 B cases time 2 million messages (1 million at 256 B), so that a native case runs for tens of milliseconds, several Windows scheduler quanta; scheduling noise is still large (±20 to 30%); on Windows, devtool turns power throttling off for every process a benchmark starts. 512 KiB rings, except a 2 MiB ring for 512 KiB messages; the last row sends 1 MiB messages through a 512 KiB ring, in pieces. The macOS* columns: 5 runs round-robin on the MacBook Air M1, 2026-10-07, with the warm-up and the stream pace, at a foreground QoS (JavaScript on Node.js 26). The &dagger;&nbsp;Linux VM columns: the same runs in a Linux VM on that MacBook, 2026-10-07 (JavaScript on Node.js 22). Against the macOS* columns they change the operating system on the same hardware; against the Linux columns, the hardware under the same operating system.</p>
+    <p class="hwnote" style="margin-bottom:18px"><b>Not all on the same hardware:</b> Linux and Windows ran on one Intel Core i9-13900H laptop, the *&nbsp;macOS columns on a MacBook Air M1, and the &dagger;&nbsp;Linux VM columns in a virtual machine on that MacBook (4 vCPUs, 4&nbsp;GB). <a href="#machine">Machine and method</a></p>
+    <div class="stack">
+      <h3>Zig (the suite, <code>bench/zig</code>)</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">50.45M</td><td class="n">46.20M</td><td class="n">55.54M</td><td class="n">50.87M</td><td class="n">55.80M</td><td class="n">46.12M</td><td class="n">57.26M</td><td class="n">54.93M</td><td class="n">43.80M</td><td class="n">43.81M</td><td class="n">64.60M</td><td class="n">46.92M</td></tr>
+            <tr><td>64 B</td><td class="n">48.39M</td><td class="n">42.45M</td><td class="n">49.88M</td><td class="n">57.05M</td><td class="n">54.18M</td><td class="n">48.62M</td><td class="n">50.05M</td><td class="n">40.79M</td><td class="n">34.04M</td><td class="n">35.06M</td><td class="n">48.96M</td><td class="n">43.35M</td></tr>
+            <tr><td>256 B</td><td class="n">41.55M</td><td class="n">34.76M</td><td class="n">58.07M</td><td class="n">55.94M</td><td class="n">48.08M</td><td class="n">43.34M</td><td class="n">48.17M</td><td class="n">28.80M</td><td class="n">29.87M</td><td class="n">28.17M</td><td class="n">53.40M</td><td class="n">51.58M</td></tr>
+            <tr><td>64 KiB</td><td class="n">487.2K</td><td class="n">438.2K</td><td class="n">644.4K</td><td class="n">645.7K</td><td class="n">497.3K</td><td class="n">448.4K</td><td class="n">426.5K</td><td class="n">518.0K</td><td class="n">496.2K</td><td class="n">440.3K</td><td class="n">642.9K</td><td class="n">651.9K</td></tr>
+            <tr><td>512 KiB</td><td class="n">62.1K</td><td class="n">60.0K</td><td class="n">86.9K</td><td class="n">81.9K</td><td class="n">59.4K</td><td class="n">54.5K</td><td class="n">53.0K</td><td class="n">69.8K</td><td class="n">62.1K</td><td class="n">58.9K</td><td class="n">87.1K</td><td class="n">84.5K</td></tr>
+            <tr><td>1 MiB</td><td class="n">15.7K</td><td class="n">14.2K</td><td class="n">25.5K</td><td class="n">22.6K</td><td class="n">15.7K</td><td class="n">14.1K</td><td class="n">25.5K</td><td class="n">21.8K</td><td class="n">16.2K</td><td class="n">14.3K</td><td class="n">25.9K</td><td class="n">25.4K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Zig calls the C API of <code>fipc.h</code> directly, so these are the library's own numbers: the suite's <code>fastipc</code>, <code>fastipc-zerocopy</code> and <code>rpc</code> scenarios in the cases of the other tables (<code>fipc_bench &lt;scenario&gt; --sizes 16,64,256,65536,524288,1048576</code>), medians of 5 runs of about 1&nbsp;s of steady traffic after a 0.2&nbsp;s warm-up, 2026-10-07. Its zero-copy receiver copies each message out with <code>memcpy</code>: on the M1 that is slower than the copying calls, whose copy is the library's own (64&nbsp;KiB and 512&nbsp;KiB); on x86 the two run alike. The other languages time a fixed count of messages after their warm-up, only 10 at 1&nbsp;MiB, about half a millisecond: their 1&nbsp;MiB rows are rough. The suite's Linux VM column: <code>fipc_bench</code> in the Linux VM on the M1, 2026-10-07.</p>
+      <h3>C</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">48.79M</td><td class="n">47.52M</td><td class="n">45.96M</td><td class="n">48.99M</td><td class="n">54.38M</td><td class="n">40.68M</td><td class="n">55.05M</td><td class="n">39.64M</td><td class="n">45.78M</td><td class="n">39.87M</td><td class="n">72.68M</td><td class="n">44.50M</td></tr>
+            <tr><td>64 B</td><td class="n">47.88M</td><td class="n">40.58M</td><td class="n">55.93M</td><td class="n">56.18M</td><td class="n">52.50M</td><td class="n">43.84M</td><td class="n">29.85M</td><td class="n">38.36M</td><td class="n">34.83M</td><td class="n">31.18M</td><td class="n">56.71M</td><td class="n">42.27M</td></tr>
+            <tr><td>256 B</td><td class="n">41.37M</td><td class="n">31.01M</td><td class="n">46.66M</td><td class="n">55.81M</td><td class="n">45.54M</td><td class="n">40.99M</td><td class="n">51.70M</td><td class="n">34.14M</td><td class="n">29.78M</td><td class="n">28.41M</td><td class="n">54.18M</td><td class="n">43.34M</td></tr>
+            <tr><td>64 KiB</td><td class="n">497.1K</td><td class="n">432.3K</td><td class="n">644.7K</td><td class="n">652.8K</td><td class="n">460.1K</td><td class="n">468.7K</td><td class="n">429.4K</td><td class="n">656.3K</td><td class="n">479.2K</td><td class="n">436.9K</td><td class="n">639.0K</td><td class="n">655.8K</td></tr>
+            <tr><td>512 KiB</td><td class="n">60.8K</td><td class="n">58.5K</td><td class="n">85.9K</td><td class="n">84.1K</td><td class="n">57.6K</td><td class="n">52.7K</td><td class="n">54.6K</td><td class="n">85.5K</td><td class="n">60.5K</td><td class="n">57.6K</td><td class="n">86.2K</td><td class="n">83.9K</td></tr>
+            <tr><td>1 MiB</td><td class="n">16.2K</td><td class="n">14.1K</td><td class="n">21.5K</td><td class="n">21.4K</td><td class="n">16.4K</td><td class="n">13.6K</td><td class="n">21.6K</td><td class="n">21.2K</td><td class="n">16.5K</td><td class="n">13.7K</td><td class="n">21.6K</td><td class="n">21.4K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>C++ (<code>fipc.hpp</code>)</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">43.49M</td><td class="n">43.07M</td><td class="n">52.21M</td><td class="n">49.52M</td><td class="n">57.91M</td><td class="n">47.24M</td><td class="n">56.88M</td><td class="n">37.55M</td><td class="n">41.78M</td><td class="n">38.44M</td><td class="n">76.88M</td><td class="n">49.06M</td></tr>
+            <tr><td>64 B</td><td class="n">44.93M</td><td class="n">35.68M</td><td class="n">53.49M</td><td class="n">56.52M</td><td class="n">57.51M</td><td class="n">46.45M</td><td class="n">47.90M</td><td class="n">37.04M</td><td class="n">35.56M</td><td class="n">32.74M</td><td class="n">53.34M</td><td class="n">44.67M</td></tr>
+            <tr><td>256 B</td><td class="n">37.96M</td><td class="n">27.03M</td><td class="n">49.69M</td><td class="n">56.90M</td><td class="n">36.64M</td><td class="n">36.06M</td><td class="n">51.83M</td><td class="n">31.94M</td><td class="n">29.09M</td><td class="n">27.06M</td><td class="n">53.23M</td><td class="n">54.66M</td></tr>
+            <tr><td>64 KiB</td><td class="n">487.6K</td><td class="n">414.2K</td><td class="n">638.2K</td><td class="n">663.1K</td><td class="n">454.9K</td><td class="n">433.2K</td><td class="n">430.5K</td><td class="n">651.1K</td><td class="n">501.5K</td><td class="n">436.2K</td><td class="n">651.0K</td><td class="n">646.3K</td></tr>
+            <tr><td>512 KiB</td><td class="n">62.8K</td><td class="n">56.2K</td><td class="n">86.1K</td><td class="n">85.4K</td><td class="n">59.6K</td><td class="n">50.9K</td><td class="n">55.6K</td><td class="n">85.5K</td><td class="n">61.8K</td><td class="n">59.0K</td><td class="n">86.9K</td><td class="n">85.7K</td></tr>
+            <tr><td>1 MiB</td><td class="n">16.4K</td><td class="n">13.0K</td><td class="n">21.2K</td><td class="n">21.3K</td><td class="n">16.5K</td><td class="n">14.1K</td><td class="n">21.6K</td><td class="n">21.2K</td><td class="n">16.6K</td><td class="n">14.0K</td><td class="n">21.1K</td><td class="n">21.3K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Until 2026-10-07 the C and C++ zero-copy receivers copied nothing, except the C++ one on Windows: the compiler dropped their copy into a buffer they never read. Every zero-copy cell is measured with the copy: macOS's and the Linux and Windows ones on 2026-10-07. On the M1 a consumer that copies its messages out with <code>memcpy</code> runs slower than the copying calls, whose copy is the library's own (64 KiB about 420K against 605K); on x86 the two run alike.</p>
+      <h3>C#</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">7.50M</td><td class="n">27.24M</td><td class="n">47.58M</td><td class="n">44.94M</td><td class="n">7.47M</td><td class="n">28.48M</td><td class="n">48.12M</td><td class="n">47.95M</td><td class="n">7.70M</td><td class="n">31.10M</td><td class="n">58.74M</td><td class="n">63.81M</td></tr>
+            <tr><td>64 B</td><td class="n">7.55M</td><td class="n">30.21M</td><td class="n">37.92M</td><td class="n">45.81M</td><td class="n">7.52M</td><td class="n">31.14M</td><td class="n">43.72M</td><td class="n">34.92M</td><td class="n">7.59M</td><td class="n">29.96M</td><td class="n">43.93M</td><td class="n">45.22M</td></tr>
+            <tr><td>256 B</td><td class="n">7.58M</td><td class="n">32.30M</td><td class="n">35.07M</td><td class="n">41.23M</td><td class="n">7.46M</td><td class="n">30.00M</td><td class="n">35.53M</td><td class="n">38.74M</td><td class="n">7.33M</td><td class="n">18.44M</td><td class="n">38.65M</td><td class="n">48.37M</td></tr>
+            <tr><td>64 KiB</td><td class="n">457.4K</td><td class="n">406.9K</td><td class="n">643.0K</td><td class="n">595.7K</td><td class="n">435.1K</td><td class="n">377.0K</td><td class="n">630.0K</td><td class="n">664.7K</td><td class="n">468.2K</td><td class="n">422.1K</td><td class="n">615.7K</td><td class="n">652.8K</td></tr>
+            <tr><td>512 KiB</td><td class="n">58.2K</td><td class="n">57.0K</td><td class="n">74.7K</td><td class="n">79.0K</td><td class="n">58.6K</td><td class="n">51.1K</td><td class="n">86.2K</td><td class="n">82.2K</td><td class="n">61.0K</td><td class="n">56.1K</td><td class="n">82.8K</td><td class="n">80.4K</td></tr>
+            <tr><td>1 MiB</td><td class="n">15.4K</td><td class="n">14.1K</td><td class="n">23.7K</td><td class="n">19.3K</td><td class="n">16.7K</td><td class="n">12.2K</td><td class="n">21.2K</td><td class="n">19.3K</td><td class="n">14.5K</td><td class="n">12.7K</td><td class="n">19.4K</td><td class="n">18.8K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Java</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">16.30M</td><td class="n">15.47M</td><td class="n">32.56M</td><td class="n">27.69M</td><td class="n">14.28M</td><td class="n">16.63M</td><td class="n">22.74M</td><td class="n">21.42M</td><td class="n">17.84M</td><td class="n">17.01M</td><td class="n">32.21M</td><td class="n">33.78M</td></tr>
+            <tr><td>64 B</td><td class="n">18.60M</td><td class="n">16.66M</td><td class="n">28.01M</td><td class="n">33.00M</td><td class="n">15.86M</td><td class="n">13.55M</td><td class="n">22.42M</td><td class="n">23.88M</td><td class="n">14.68M</td><td class="n">15.24M</td><td class="n">28.87M</td><td class="n">24.45M</td></tr>
+            <tr><td>256 B</td><td class="n">19.02M</td><td class="n">16.75M</td><td class="n">24.16M</td><td class="n">25.99M</td><td class="n">15.08M</td><td class="n">12.11M</td><td class="n">19.23M</td><td class="n">22.58M</td><td class="n">13.56M</td><td class="n">14.59M</td><td class="n">25.01M</td><td class="n">25.63M</td></tr>
+            <tr><td>64 KiB</td><td class="n">488.6K</td><td class="n">383.1K</td><td class="n">618.4K</td><td class="n">625.4K</td><td class="n">442.1K</td><td class="n">374.9K</td><td class="n">587.3K</td><td class="n">590.0K</td><td class="n">463.1K</td><td class="n">408.7K</td><td class="n">619.5K</td><td class="n">630.3K</td></tr>
+            <tr><td>512 KiB</td><td class="n">63.2K</td><td class="n">55.1K</td><td class="n">84.1K</td><td class="n">85.4K</td><td class="n">58.2K</td><td class="n">52.8K</td><td class="n">84.3K</td><td class="n">79.6K</td><td class="n">60.8K</td><td class="n">54.9K</td><td class="n">87.1K</td><td class="n">84.7K</td></tr>
+            <tr><td>1 MiB</td><td class="n">13.1K</td><td class="n">13.7K</td><td class="n">22.7K</td><td class="n">21.4K</td><td class="n">15.5K</td><td class="n">11.3K</td><td class="n">22.9K</td><td class="n">21.8K</td><td class="n">15.6K</td><td class="n">12.1K</td><td class="n">17.7K</td><td class="n">20.8K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Python</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">1.57M</td><td class="n">1.82M</td><td class="n">2.24M</td><td class="n">1.25M</td><td class="n">1.05M</td><td class="n">1.06M</td><td class="n">1.37M</td><td class="n">811.9K</td><td class="n">979.0K</td><td class="n">983.6K</td><td class="n">1.26M</td><td class="n">785.1K</td></tr>
+            <tr><td>64 B</td><td class="n">1.59M</td><td class="n">1.75M</td><td class="n">2.22M</td><td class="n">1.24M</td><td class="n">1.06M</td><td class="n">1.05M</td><td class="n">1.34M</td><td class="n">803.0K</td><td class="n">1.01M</td><td class="n">979.6K</td><td class="n">1.25M</td><td class="n">799.4K</td></tr>
+            <tr><td>256 B</td><td class="n">1.58M</td><td class="n">1.78M</td><td class="n">2.14M</td><td class="n">1.23M</td><td class="n">1.05M</td><td class="n">1.02M</td><td class="n">1.31M</td><td class="n">804.6K</td><td class="n">993.5K</td><td class="n">955.2K</td><td class="n">1.24M</td><td class="n">793.7K</td></tr>
+            <tr><td>64 KiB</td><td class="n">368.6K</td><td class="n">344.4K</td><td class="n">457.1K</td><td class="n">400.3K</td><td class="n">237.9K</td><td class="n">208.6K</td><td class="n">140.3K</td><td class="n">234.0K</td><td class="n">229.4K</td><td class="n">210.4K</td><td class="n">178.7K</td><td class="n">234.9K</td></tr>
+            <tr><td>512 KiB</td><td class="n">57.9K</td><td class="n">50.7K</td><td class="n">80.2K</td><td class="n">76.7K</td><td class="n">31.9K</td><td class="n">29.0K</td><td class="n">30.7K</td><td class="n">40.3K</td><td class="n">29.3K</td><td class="n">27.9K</td><td class="n">46.6K</td><td class="n">39.4K</td></tr>
+            <tr><td>1 MiB</td><td class="n">15.7K</td><td class="n">13.6K</td><td class="n">21.1K</td><td class="n">20.3K</td><td class="n">14.8K</td><td class="n">12.9K</td><td class="n">20.5K</td><td class="n">19.9K</td><td class="n">6.7K</td><td class="n">2.8K</td><td class="n">15.1K</td><td class="n">8.4K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Rust</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">52.51M</td><td class="n">39.46M</td><td class="n">50.01M</td><td class="n">49.66M</td><td class="n">60.32M</td><td class="n">33.01M</td><td class="n">50.63M</td><td class="n">37.28M</td><td class="n">42.52M</td><td class="n">32.07M</td><td class="n">70.72M</td><td class="n">55.14M</td></tr>
+            <tr><td>64 B</td><td class="n">45.11M</td><td class="n">40.06M</td><td class="n">53.72M</td><td class="n">57.13M</td><td class="n">57.13M</td><td class="n">32.47M</td><td class="n">46.09M</td><td class="n">35.71M</td><td class="n">31.79M</td><td class="n">31.09M</td><td class="n">48.10M</td><td class="n">46.57M</td></tr>
+            <tr><td>256 B</td><td class="n">38.04M</td><td class="n">26.49M</td><td class="n">58.53M</td><td class="n">56.40M</td><td class="n">35.98M</td><td class="n">24.64M</td><td class="n">48.23M</td><td class="n">31.60M</td><td class="n">26.99M</td><td class="n">22.55M</td><td class="n">52.29M</td><td class="n">53.14M</td></tr>
+            <tr><td>64 KiB</td><td class="n">510.2K</td><td class="n">467.1K</td><td class="n">647.1K</td><td class="n">672.5K</td><td class="n">441.2K</td><td class="n">406.5K</td><td class="n">431.7K</td><td class="n">664.3K</td><td class="n">500.4K</td><td class="n">427.7K</td><td class="n">651.1K</td><td class="n">659.6K</td></tr>
+            <tr><td>512 KiB</td><td class="n">60.5K</td><td class="n">56.1K</td><td class="n">84.5K</td><td class="n">85.9K</td><td class="n">58.9K</td><td class="n">51.7K</td><td class="n">53.9K</td><td class="n">83.0K</td><td class="n">60.9K</td><td class="n">55.4K</td><td class="n">87.2K</td><td class="n">85.8K</td></tr>
+            <tr><td>1 MiB</td><td class="n">16.1K</td><td class="n">13.3K</td><td class="n">21.1K</td><td class="n">22.4K</td><td class="n">17.1K</td><td class="n">13.5K</td><td class="n">21.6K</td><td class="n">21.1K</td><td class="n">16.2K</td><td class="n">14.3K</td><td class="n">21.3K</td><td class="n">21.2K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Lua (LuaJIT)</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">50.59M</td><td class="n">46.05M</td><td class="n">57.58M</td><td class="n">51.08M</td><td class="n">41.31M</td><td class="n">40.41M</td><td class="n">39.05M</td><td class="n">47.83M</td><td class="n">44.63M</td><td class="n">42.53M</td><td class="n">52.09M</td><td class="n">42.27M</td></tr>
+            <tr><td>64 B</td><td class="n">49.27M</td><td class="n">39.67M</td><td class="n">48.44M</td><td class="n">53.89M</td><td class="n">40.51M</td><td class="n">39.62M</td><td class="n">29.01M</td><td class="n">48.03M</td><td class="n">33.66M</td><td class="n">34.29M</td><td class="n">29.96M</td><td class="n">31.03M</td></tr>
+            <tr><td>256 B</td><td class="n">40.04M</td><td class="n">30.30M</td><td class="n">54.08M</td><td class="n">48.05M</td><td class="n">42.53M</td><td class="n">41.87M</td><td class="n">36.48M</td><td class="n">43.57M</td><td class="n">28.58M</td><td class="n">28.80M</td><td class="n">41.29M</td><td class="n">43.32M</td></tr>
+            <tr><td>64 KiB</td><td class="n">459.2K</td><td class="n">401.6K</td><td class="n">605.7K</td><td class="n">560.6K</td><td class="n">416.0K</td><td class="n">406.8K</td><td class="n">413.4K</td><td class="n">585.6K</td><td class="n">433.3K</td><td class="n">373.1K</td><td class="n">568.8K</td><td class="n">533.3K</td></tr>
+            <tr><td>512 KiB</td><td class="n">57.8K</td><td class="n">56.8K</td><td class="n">85.4K</td><td class="n">80.8K</td><td class="n">57.8K</td><td class="n">21.8K</td><td class="n">51.6K</td><td class="n">73.2K</td><td class="n">57.4K</td><td class="n">56.3K</td><td class="n">83.8K</td><td class="n">79.7K</td></tr>
+            <tr><td>1 MiB</td><td class="n">15.8K</td><td class="n">12.4K</td><td class="n">18.0K</td><td class="n">19.8K</td><td class="n">15.1K</td><td class="n">13.8K</td><td class="n">16.4K</td><td class="n">16.8K</td><td class="n">15.2K</td><td class="n">12.7K</td><td class="n">21.4K</td><td class="n">18.4K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>JavaScript (Node.js 22, async calls)</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">2.74M</td><td class="n">2.13M</td><td class="n">3.33M</td><td class="n">2.17M</td><td class="n">760.5K</td><td class="n">555.6K</td><td class="n">957.4K</td><td class="n">636.1K</td><td class="n">2.31M</td><td class="n">1.78M</td><td class="n">2.97M</td><td class="n">1.81M</td></tr>
+            <tr><td>64 B</td><td class="n">2.64M</td><td class="n">2.08M</td><td class="n">3.30M</td><td class="n">1.98M</td><td class="n">762.6K</td><td class="n">589.4K</td><td class="n">982.5K</td><td class="n">623.2K</td><td class="n">2.42M</td><td class="n">1.78M</td><td class="n">2.99M</td><td class="n">1.87M</td></tr>
+            <tr><td>256 B</td><td class="n">2.62M</td><td class="n">2.07M</td><td class="n">3.22M</td><td class="n">2.06M</td><td class="n">776.4K</td><td class="n">598.1K</td><td class="n">941.6K</td><td class="n">639.9K</td><td class="n">2.40M</td><td class="n">1.78M</td><td class="n">2.80M</td><td class="n">1.86M</td></tr>
+            <tr><td>64 KiB</td><td class="n">395.7K</td><td class="n">379.1K</td><td class="n">526.8K</td><td class="n">250.5K</td><td class="n">281.0K</td><td class="n">244.4K</td><td class="n">339.8K</td><td class="n">222.5K</td><td class="n">353.7K</td><td class="n">331.2K</td><td class="n">495.9K</td><td class="n">203.9K</td></tr>
+            <tr><td>512 KiB</td><td class="n">57.6K</td><td class="n">53.5K</td><td class="n">81.3K</td><td class="n">74.5K</td><td class="n">53.9K</td><td class="n">51.5K</td><td class="n">43.5K</td><td class="n">72.5K</td><td class="n">57.2K</td><td class="n">56.0K</td><td class="n">82.3K</td><td class="n">77.7K</td></tr>
+            <tr><td>1 MiB</td><td class="n">9.2K</td><td class="n">11.3K</td><td class="n">17.4K</td><td class="n">10.2K</td><td class="n">7.7K</td><td class="n">8.6K</td><td class="n">15.6K</td><td class="n">5.6K</td><td class="n">9.5K</td><td class="n">11.1K</td><td class="n">17.0K</td><td class="n">10.2K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Go (Go 1.27, without cgo)</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <colgroup><col><col span="4" class="g"><col span="4" class="g"><col span="4" class="g"></colgroup>
+          <thead>
+            <tr><th scope="col" rowspan="2">Message</th><th scope="colgroup" colspan="4" class="grp">Copy</th><th scope="colgroup" colspan="4" class="grp">Zero-copy</th><th scope="colgroup" colspan="4" class="grp">RPC</th></tr>
+            <tr><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th><th scope="col" class="n">Linux</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS*</th><th scope="col" class="n">Linux VM&dagger;</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16 B</td><td class="n">9.96M</td><td class="n">10.87M</td><td class="n">10.58M</td><td class="n">10.94M</td><td class="n">5.77M</td><td class="n">8.35M</td><td class="n">5.70M</td><td class="n">5.86M</td><td class="n">9.73M</td><td class="n">10.63M</td><td class="n">10.12M</td><td class="n">10.29M</td></tr>
+            <tr><td>64 B</td><td class="n">9.22M</td><td class="n">11.04M</td><td class="n">9.30M</td><td class="n">9.53M</td><td class="n">5.46M</td><td class="n">7.90M</td><td class="n">5.73M</td><td class="n">5.86M</td><td class="n">9.97M</td><td class="n">10.56M</td><td class="n">9.03M</td><td class="n">9.35M</td></tr>
+            <tr><td>256 B</td><td class="n">8.65M</td><td class="n">11.22M</td><td class="n">9.41M</td><td class="n">9.67M</td><td class="n">5.39M</td><td class="n">7.77M</td><td class="n">5.52M</td><td class="n">5.68M</td><td class="n">9.49M</td><td class="n">9.84M</td><td class="n">9.20M</td><td class="n">9.36M</td></tr>
+            <tr><td>64 KiB</td><td class="n">475.1K</td><td class="n">435.1K</td><td class="n">595.9K</td><td class="n">614.1K</td><td class="n">434.0K</td><td class="n">404.0K</td><td class="n">574.1K</td><td class="n">586.5K</td><td class="n">448.1K</td><td class="n">451.5K</td><td class="n">598.3K</td><td class="n">591.2K</td></tr>
+            <tr><td>512 KiB</td><td class="n">57.0K</td><td class="n">56.2K</td><td class="n">85.4K</td><td class="n">82.1K</td><td class="n">56.4K</td><td class="n">59.1K</td><td class="n">84.7K</td><td class="n">83.9K</td><td class="n">62.9K</td><td class="n">56.8K</td><td class="n">85.3K</td><td class="n">81.7K</td></tr>
+            <tr><td>1 MiB</td><td class="n">15.0K</td><td class="n">17.9K</td><td class="n">21.3K</td><td class="n">20.2K</td><td class="n">16.2K</td><td class="n">17.3K</td><td class="n">21.7K</td><td class="n">20.7K</td><td class="n">15.7K</td><td class="n">17.3K</td><td class="n">20.4K</td><td class="n">20.4K</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Go's calls go into the library through purego, each behind a mutex of its direction: that costs more than copying a short message, so copied 16-byte messages run at about a quarter of Rust's rate on Windows and a fifth of it on Linux. Zero-copy takes two calls per message on each side where a copy takes one, so in Go it runs slower than copying for short messages; from 64 KiB on, Go runs as fast as the other languages.</p>
+      <p class="note">C#'s object layer (<code>FipcConnection</code>) adds about 30 ns per message over the raw layer on both OSes, nearly all of it the SafeHandle's reference count: for 16-byte copies, 80 ns against 42 ns per send and receive on Windows, 72 ns against 38 ns on Linux, in one process with no waiting.</p>
+    </div>
+  </section>
+
+  <section class="plate" id="machine" aria-labelledby="h-mach">
+    <div class="plate-head"><h2 id="h-mach">Machine and method</h2><span class="eyebrow">two machines</span></div>
+    <div class="cols">
+      <ul class="plain">
+        <li><b>The Linux and Windows columns:</b> an ASUS Zenbook 14 (UX3404VC) laptop on AC power, Windows power plan "High performance".</li>
+        <li>Intel Core i9-13900H: 6 P-cores with Hyper-Threading and 8 E-cores, 20 logical CPUs; 32 GB RAM.</li>
+        <li>Windows 11 Pro 10.0.26200. WSL2 Ubuntu 24.04.3 with glibc 2.39 and 20 vCPUs.</li>
+        <li>No CPU pinning. IDEs, a browser and background processes idle alongside; Windows and WSL ran one after the other.</li>
+        <li><b>The macOS* column</b>, a different machine: a MacBook Air (M1, 4 performance and 4 efficiency cores, 8 GB RAM), macOS 26.5.1, on power; ReleaseFast for Apple M1, unpinned. Medians of <code>devtool bench-compare --ab --runs 5 --duration 1</code> on 2026-10-07: 5 alternating rounds of 1 s per case against the library without the stream pace.</li>
+        <li><b>The &dagger;&nbsp;Linux VM column:</b> the same MacBook Air, Linux in a Lima 2.2.1 VM (Apple Virtualization framework): Ubuntu 24.04.5 arm64, kernel 6.8, glibc 2.39, 4 vCPUs, 4&nbsp;GB; ReleaseFast for generic ARMv8.0-A, unpinned; the same A/B as the macOS* column, 2026-10-07. The languages' Linux VM columns: everything built the same way, 5 runs round-robin of each benchmark with Node.js 22.23.3 and Go 1.27.1, the Mac otherwise idle, 2026-10-07.</li>
+        <li>On the M1, under macOS and Linux alike, the timer ticks at 24 MHz (about 42 ns), so latencies are quantized to that: 167 ns is 4 ticks. Its cache line for the lines that matter is 128 bytes, so a ring's head and tail indices, 64 bytes apart, share one.</li>
+      </ul>
+      <ul class="plain">
+        <li><b>The library table's</b> Linux and Windows columns are an A/B run: 5 alternating rounds of 0.3 s per case, medians; its macOS* and Linux VM columns ran 1 s per case. The suite's own runs, below, are longer.</li>
+        <li><b>Throughput:</b> after a 0.2 s warm-up, 5 runs of about 1 s of steady traffic; every message's length is checked, and zero-copy receivers copy each message out.</li>
+        <li><b>Latency:</b> 5 runs of 1 s of samples on the CPU's time-stamp counter (on Apple Silicon, the 24 MHz virtual counter); a round trip minus the peer's hold time.</li>
+        <li><b>Setup:</b> 5 runs of 1 s of whole connection lives.</li>
+        <li>Reproduce with <code>python devtool.py bench zig-all</code>, or <code>bench-compare --ab</code> for an A/B against another revision.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/docs/perf/baseline.md">baseline.md</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

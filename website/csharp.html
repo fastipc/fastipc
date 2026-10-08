@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for C#: shared-memory IPC for .NET (Fipc on NuGet)</title>
+<meta name="description" content="Shared-memory IPC in C# and .NET: dotnet add package Fipc, then FipcListener and FipcConnection for messages and RPC between two processes.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/csharp.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for C#: shared-memory IPC for .NET (Fipc on NuGet)">
+<meta property="og:description" content="Shared-memory IPC in C# and .NET: dotnet add package Fipc, then FipcListener and FipcConnection for messages and RPC between two processes.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/csharp.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for C#: shared-memory IPC for .NET (Fipc on NuGet)">
+<meta name="twitter:description" content="Shared-memory IPC in C# and .NET: dotnet add package Fipc, then FipcListener and FipcConnection for messages and RPC between two processes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html" aria-current="page">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">Fipc on NuGet · using FastIpc</span>
+    <h1>C#</h1>
+    <p class="lede">Two layers. <code>FipcListener</code> and <code>FipcConnection</code> are objects on SafeHandles that are safe to dispose from any thread. Underneath, <code>Fipc</code> declares the C API one to one over <code>IntPtr</code> handles, for the hottest loops. The package targets .NET Standard 2.1 and carries the native libraries for Linux x64 (glibc 2.34+), Windows x64 and macOS 14.4+ on Apple Silicon (osx-arm64).</p>
+    <div class="install" style="max-width:520px"><span class="lang">Install</span><code>dotnet add package Fipc</code><button class="copy" type="button" data-copy="dotnet add package Fipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Plain messages</a><a href="#results">Results, not exceptions</a><a href="#zerocopy">Zero-copy</a><a href="#rpc">RPC</a><a href="#threads">Threads and Dispose</a><a href="#raw">The raw layer</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">A server listens on a name and accepts one client at a time; a client connects to the name, and <code>Connect</code> waits for the server to listen and accept, so the two run in different processes or on different threads. Each program is a console project of its own (<code>dotnet new console</code>) with the <code>Fipc</code> package. Timeouts are int milliseconds, the last parameter: 0 doesn't wait, <code>Fipc.Forever</code> (−1, like <code>Timeout.Infinite</code>) waits for ever. The pair makes the exchange every example on this site makes, an RPC request with opcode 1 and the payload <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client (<a href="index.html#interop">every pair of languages is tested</a>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>Server/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// rings of 1 MiB each way
+FipcListener.Listen("my_channel", 1 &lt;&lt; 20,
+    out FipcListener? listener);
+using (listener)
+{
+    // waits for a client
+    listener!.Accept(out FipcConnection? conn, Fipc.Forever);
+    using (conn)
+    {
+        if (conn!.RpcReceive(out FipcRpcHeader request,
+                out byte[] payload, Fipc.Forever)
+            == FipcResult.Ok)
+        {
+            string upper = Encoding.UTF8.GetString(payload)
+                .ToUpperInvariant();
+            conn.RpcRespond(request.Id, request.Opcode, 0,
+                Encoding.UTF8.GetBytes(upper), Fipc.Forever);
+        }
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>Client/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+if (FipcConnection.Connect("my_channel",
+        out FipcConnection? conn, 5000) != FipcResult.Ok)
+    return 1;
+using (conn)
+{
+    conn!.RpcSubmit(opcode: 1, "ping"u8, out ulong id,
+        Fipc.Forever);
+    conn.RpcReceive(out FipcRpcHeader response,
+        out byte[] reply, Fipc.Forever);
+    Console.WriteLine(Encoding.UTF8.GetString(reply));  // PING
+}
+return 0;</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Plain messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">Without RPC, a connection carries plain messages: <code>Send</code> takes a message of any size, and <code>Receive</code> returns each one whole in a new array (or fills your span). This server echoes every message back until its client leaves, which ends its next <code>Receive</code> with <code>Disconnected</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>EchoServer/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using FastIpc;
+
+// rings of 1 MiB each way
+FipcListener.Listen("demo", 1 &lt;&lt; 20, out var listener);
+using (listener)
+{
+    listener!.Accept(out FipcConnection? conn, Fipc.Forever);
+    using (conn)
+    {
+        while (conn!.Receive(out byte[] msg, Fipc.Forever)
+               == FipcResult.Ok)
+            conn.Send(msg, Fipc.Forever);   // echo
+        // Disconnected: the client closed or exited
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>EchoClient/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+if (FipcConnection.Connect("demo", out var conn, 5000)
+    != FipcResult.Ok)
+    return;
+
+using (conn)
+{
+    conn!.Send("hello"u8, Fipc.Forever);
+    if (conn.Receive(out byte[] reply, Fipc.Forever)
+        == FipcResult.Ok)
+        Console.WriteLine(Encoding.UTF8.GetString(reply));
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="results" aria-labelledby="h-res">
+    <div class="plate-head"><h2 id="h-res">Results, not exceptions</h2><span class="eyebrow">FipcResult</span></div>
+    <div class="cols">
+      <p>Every call returns a <code>FipcResult</code>: <code>Ok</code>, <code>Timeout</code>, <code>Disconnected</code>, <code>Cancelled</code>, <code>TooLarge</code>, <code>Invalid</code>, <code>NoMemory</code> or <code>AddrInUse</code>. A timeout, the peer's end and a buffer too small are normal results. Only a mistake throws, such as a call after <code>Dispose</code> (<code>ObjectDisposedException</code>).</p>
+      <div class="code"><div class="label"><span>receive into a span</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">Span&lt;byte&gt; buf = stackalloc byte[256];
+switch (conn.Receive(buf, out int len, 100))
+{
+    case FipcResult.Ok:       Handle(buf[..len]); break;
+    case FipcResult.TooLarge: break; // needs len bytes
+    case FipcResult.Timeout:  break;
+    case FipcResult.Disconnected: conn.Dispose(); break;
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.MaxPiece bytes</span></div>
+    <p class="intro">Write the message into a <code>Span&lt;byte&gt;</code> of the ring and commit it; read a <code>ReadOnlySpan&lt;byte&gt;</code> of the ring and release it. A span stays valid until its commit or release.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">if (conn.SendAcquire(5, out Span&lt;byte&gt; buf, Fipc.Forever)
+    == FipcResult.Ok)
+{
+    "hello"u8.CopyTo(buf);
+    conn.SendCommit(5);
+}</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">if (conn.ReceiveAcquire(out ReadOnlySpan&lt;byte&gt; msg,
+        Fipc.Forever) == FipcResult.Ok)
+{
+    Handle(msg);            // read-only, in the ring
+    conn.ReceiveRelease();  // frees its room
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="rpc" aria-labelledby="h-rpc">
+    <div class="plate-head"><h2 id="h-rpc">RPC</h2><span class="eyebrow">FipcRpcHeader: Id, Kind, Opcode, Status, Length</span></div>
+    <p class="intro">Requests carry your opcode; responses echo the request's id and add a status. <code>RpcReceive</code> fills a span or returns a new array of any size. Use a connection for RPC or for plain messages, not both.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>client: call</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">const uint Upper = 1;
+
+client.RpcSubmit(Upper, "ping"u8, out ulong id, Fipc.Forever);
+
+if (client.RpcReceive(out FipcRpcHeader reply,
+        out byte[] payload, Fipc.Forever) == FipcResult.Ok
+    &amp;&amp; reply.Kind == FipcRpcKind.Response &amp;&amp; reply.Id == id)
+    Console.WriteLine($"{reply.Status}: "
+        + Encoding.UTF8.GetString(payload));</code></pre></div>
+      <div class="code"><div class="label"><span>server: answer</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">while (server.RpcReceive(out FipcRpcHeader req,
+       out byte[] payload, Fipc.Forever) == FipcResult.Ok)
+{
+    if (req.Kind != FipcRpcKind.Request) continue;
+    byte[] upper = Encoding.UTF8.GetBytes(
+        Encoding.UTF8.GetString(payload).ToUpperInvariant());
+    server.RpcRespond(req.Id, req.Opcode, 0, upper,
+        Fipc.Forever);
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads and Dispose</h2><span class="eyebrow">SafeHandle</span></div>
+    <ul class="plain">
+      <li>On a connection, one thread at a time sends and one receives; the two may run at once. <code>Cancel</code> and <code>Dispose</code> may be called from any thread, at any time.</li>
+      <li><code>Dispose</code> cancels the handle, so a waiting call returns <code>Cancelled</code>, and the native close runs once the calls in progress have returned. No call ever runs on a closed connection, and a zero-copy span stays valid until its commit or release.</li>
+      <li>To stop an IO thread: <code>Dispose</code>, then join the thread with a timeout.</li>
+      <li>A <code>Disconnected</code> connection is final: dispose it, then accept or connect a new one.</li>
+    </ul>
+  </section>
+
+  <section class="plate" id="raw" aria-labelledby="h-raw">
+    <div class="plate-head"><h2 id="h-raw">The raw layer</h2><span class="eyebrow">static class Fipc</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>Fipc</code> declares the C API one to one, over <code>IntPtr</code> handles, pointers or spans. It costs nothing beyond the native call. Each object-layer call holds its SafeHandle, which costs about 15 ns a call, or about 30 ns per message sent and received (<a href="performance.html#bindings">measured</a>).</p>
+        <p>It enforces nothing either: <code>Close</code> needs the handle to itself (cancel, join the threads that use it, then close), and closing under a running call frees memory the call still uses.</p>
+      </div>
+      <div class="code"><div class="label"><span>raw calls</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">Fipc.Connect("demo", out IntPtr conn, 5000);
+Fipc.Send(conn, "hello"u8, Fipc.Forever);
+Fipc.Close(conn);</code></pre></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js"></script>
+</body>
+</html>
