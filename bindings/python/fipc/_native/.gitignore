@@ -1,0 +1,8 @@
+# The native library a wheel bundles here: never committed (devtool package python builds wheels in a staged copy)
+*.so
+*.so.*
+*.dll
+*.dylib
+
+# Keep directory structure
+!.gitignore

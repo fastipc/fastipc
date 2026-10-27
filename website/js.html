@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)</title>
+<meta name="description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/js.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)">
+<meta property="og:description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/js.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)">
+<meta name="twitter:description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css?v=5c1851ba">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html" aria-current="page">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">fipc on npm · import { Listener, Connection } from "fipc"</span>
+    <h1>JavaScript</h1>
+    <p class="lede">One Node-API addon for Node.js 22+, Bun and Deno 2: <code>createStream</code> and <code>connectStream</code> give streams, connections with copied and zero-copy messages; <code>createBroadcast</code> and <code>joinBroadcast</code> broadcasts; <code>createQueue</code> and <code>joinQueue</code> work queues; <code>createService</code> and <code>joinService</code> services, whose clients' requests each go to one of a pool of servers, which replies. Every call that may wait returns a Promise and leaves the event loop running; a <code>Sync</code> form waits on the calling thread. A call the library refuses fails with a <code>FipcError</code> whose <code>code</code> names the result. TypeScript types included; nothing is compiled when you install it. The package carries the addon and the native library for Windows x64, Linux x64 and ARM64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon.</p>
+    <div class="install" style="max-width:620px"><span class="lang">npm</span><code>npm install fipc</code><button class="copy" type="button" data-copy="npm install fipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Messages</a><a href="#async">Async and Sync</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#batches">Batches</a><a href="#broadcast">Broadcast</a><a href="#queue">Work queue</a><a href="#service">Service</a><a href="#interop">Any language</a><a href="#lifetimes">Lifetimes and workers</a><a href="#setup">Node.js, Bun, Deno</a><a href="#reference">Reference</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">Start the two in either order, in two terminals (<code>node server.mjs</code>, <code>node client.mjs</code>; <code>bun</code> and <code>deno run -A</code> run them as they are): <code>connectStream</code> waits up to its timeout, in milliseconds, for a server to create the stream and accept; a call without a timeout waits as long as it takes. The pair makes the exchange every example on this site makes, the message <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { createStream } from "fipc";
+
+const listener = createStream("my_channel", 1 &lt;&lt; 20); // rings of 1 MiB each way
+const conn = await listener.accept(); // waits for a client; the event loop runs meanwhile
+const message = await conn.receive();
+await conn.send(message.toString().toUpperCase());
+conn.close();
+listener.close();</code></pre></div>
+      <div class="code"><div class="label"><span>client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { connectStream } from "fipc";
+
+const conn = await connectStream("my_channel", 5000); // waits up to 5 s for the server
+await conn.send("ping");
+console.log((await conn.receive()).toString()); // PING
+conn.close();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">A connection carries messages: <code>send</code> takes a message of any size, a string (sent as UTF-8), a <code>Buffer</code> or any <code>TypedArray</code>, a <code>DataView</code> or an <code>ArrayBuffer</code>, and <code>receive</code> resolves to each one whole, as a new <code>Buffer</code>. A message longer than the ring travels in pieces and arrives whole. This server echoes every message back until its client leaves, which ends its next <code>receive</code> with <code>FIPC_DISCONNECTED</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo_server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { createStream } from "fipc";
+
+// rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
+const listener = createStream("demo", 1 &lt;&lt; 20);
+const conn = await listener.accept(); // waits for a client
+for (;;) {
+  let message;
+  try {
+    message = await conn.receive();
+  } catch (error) {
+    if (error.code === "FIPC_DISCONNECTED") break; // the client is gone
+    throw error;
+  }
+  await conn.send(message); // echo, any size
+}
+console.log("client gone");
+conn.close();
+listener.close();</code></pre></div>
+      <div class="code"><div class="label"><span>echo_client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { connectStream } from "fipc";
+
+const conn = await connectStream("demo", 5000);
+for (const word of ["hello", "shared", "memory"]) {
+  await conn.send(word);
+  console.log((await conn.receive()).toString());
+}
+conn.close();</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="async" aria-labelledby="h-async">
+    <div class="plate-head"><h2 id="h-async">Async and Sync calls</h2><span class="eyebrow">the event loop keeps running</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>A plain call (<code>accept</code>, <code>connect</code>, <code>send</code>, <code>receive</code>, <code>receiveInto</code>, ...) returns a Promise. It makes the call at once when it needn't wait (a message is there, the ring has room), which costs no more than the Promise; otherwise a thread of the connection's own, one per direction (a listener has one for accepting), waits in the library and settles the promise. libuv's thread pool is never used, so files, DNS and crypto never wait behind FastIPC, and no number of waiting calls starves it.</p>
+        <p>Calls of one direction run in the order they were made, so sends needn't be awaited one by one. Don't change a buffer you passed to <code>send</code>, or read one you passed to <code>receiveInto</code>, until its promise settles, and don't resize or transfer its ArrayBuffer meanwhile: the call uses the memory in place.</p>
+        <p>The <code>Sync</code> form (<code>acceptSync</code>, <code>connectStreamSync</code>, <code>sendSync</code>, <code>receiveSync</code>, ...) waits on the calling thread and blocks the event loop meanwhile: the fastest way to make many calls in a tight loop or in a <code>Worker</code>, and with <code>NO_WAIT</code> a way to poll. While an async call of a direction is pending, a <code>Sync</code> call of that direction fails with <code>ERR_FIPC_BUSY</code>.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>a receive that waits, and a timer that keeps firing</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const timer = setInterval(() =&gt; console.log("the event loop runs"), 100);
+const message = await conn.receive(); // waits without blocking the timer
+clearInterval(timer);</code></pre></div>
+        <div class="code"><div class="label"><span>polling once a frame, with the Sync calls</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">// once a frame: take what has arrived, without waiting
+for (;;) {
+  let message;
+  try {
+    message = conn.receiveSync(NO_WAIT);
+  } catch (error) {
+    if (error.code === "FIPC_TIMEOUT") break; // nothing more this frame
+    throw error; // "FIPC_DISCONNECTED": the peer is gone
+  }
+  handle(message);
+}</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="errors" aria-labelledby="h-err">
+    <div class="plate-head"><h2 id="h-err">Errors and timeouts</h2><span class="eyebrow">FipcError, its code</span></div>
+    <p class="intro">A call the library refuses rejects (in the <code>Sync</code> form, throws) a <code>FipcError</code>: its <code>code</code> is <code>"FIPC_TIMEOUT"</code>, <code>"FIPC_DISCONNECTED"</code>, <code>"FIPC_CANCELLED"</code>, <code>"FIPC_TOO_LARGE"</code>, <code>"FIPC_INVALID"</code>, <code>"FIPC_NO_MEMORY"</code>, <code>"FIPC_ADDR_IN_USE"</code>, on a broadcast <code>"FIPC_OVERRUN"</code> or <code>"FIPC_UNSUBSCRIBED"</code>, and on a service's client <code>"FIPC_ABANDONED"</code> (the server that took the request ended before it replied), the C API's results (<code>result</code> is the number, <code>call</code> the method). A misuse is a <code>TypeError</code> or <code>RangeError</code>, or an <code>Error</code> with the code <code>ERR_FIPC_CLOSED</code> (a closed handle) or <code>ERR_FIPC_BUSY</code>. The timeout comes last, in milliseconds: <code>NO_WAIT</code> (0) doesn't wait, leaving it out (or <code>FOREVER</code>) waits as long as it takes. <code>FIPC_DISCONNECTED</code> is final: close the connection, then accept or connect a new one.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>wait at most 100 ms</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">try {
+  handle(await conn.receive(100)); // waits at most 100 ms
+} catch (error) {
+  if (error.code !== "FIPC_TIMEOUT") throw error; // "FIPC_DISCONNECTED": the peer is gone
+}</code></pre></div>
+      <div class="code"><div class="label"><span>a buffer of your own: FIPC_TOO_LARGE says how much room</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">let buffer = Buffer.alloc(4096);
+let length;
+try {
+  length = await conn.receiveInto(buffer);
+} catch (error) {
+  if (error.code !== "FIPC_TOO_LARGE") throw error;
+  buffer = Buffer.alloc(error.length); // the message stays queued: make room, then take it
+  length = await conn.receiveInto(buffer);
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.maxPiece bytes</span></div>
+    <p class="intro">Write a message into the ring and commit it; read one in the ring and release it. <code>sendAcquire</code> resolves to a <code>Uint8Array</code> over room in the ring; <code>sendCommit</code> publishes its first bytes (all, or fewer). <code>receiveAcquire</code> resolves to a <code>Uint8Array</code> over the message, valid until <code>receiveRelease</code>, the next receive or <code>close</code>. When the bytes stop being valid the view is detached, its length 0, so a stale view can never touch the ring; one that can still be reached keeps its connection open. A message of several pieces fails with <code>FIPC_TOO_LARGE</code> and stays queued for <code>receive</code>. Making a view costs more than copying a short message, so in JavaScript zero-copy pays off for long ones.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const slot = await conn.sendAcquire(5); // room in the ring: a Uint8Array
+slot.set(Buffer.from("hello"));
+conn.sendCommit(5); // sent; the view is detached</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const view = await conn.receiveAcquire(); // the message in the ring
+handle(view); // read it in place
+conn.receiveRelease(); // frees its room; view.length is 0 from now on</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="batches" aria-labelledby="h-batch">
+    <div class="plate-head"><h2 id="h-batch">Batches</h2><span class="eyebrow">many messages per call, both ends</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>conn.sendMany(messages, timeout)</code> sends an array of messages (strings or bytes, copied when the call is made) in order and publishes them together, with at most one wake of the receivers, and resolves to how many went; the timeout bounds the whole call (<code>NO_WAIT</code>: only what fits now). Every message is checked before any goes. A failure is the first message that didn't go, with how many went in the error's <code>sent</code>.</p>
+        <p><code>conn.receiveMany(maxCount, timeout)</code> waits for the next message, then takes every further one already there (up to <code>maxCount</code>, 64 KiB of them) and resolves to an array of <code>Buffer</code>s. Both have a <code>Sync</code> form. A broadcast's subscriber takes those its publisher has moved past; a service's client sends a batch of requests (owed as its sends are) and receives their replies in order; a server's batches fail with <code>FIPC_INVALID</code>. <b>Batch both ends</b>: a receiver that takes one message per call falls behind a batching sender.</p>
+      </div>
+      <div class="code"><div class="label"><span>a batch each way</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const sent = await conn.sendMany([&quot;one&quot;, &quot;two&quot;, &quot;three&quot;]); // published together
+for (const message of await peer.receiveMany(64)) { // every message already there, up to 64
+  handle(message);
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="broadcast" aria-labelledby="h-bc">
+    <div class="plate-head"><h2 id="h-bc">Broadcast</h2><span class="eyebrow">one publisher, many subscribers</span></div>
+    <p class="intro">A broadcast sends every message of one publisher to each of its subscribers, in any processes of the user; each message is stored once, in memory every subscriber maps. Messages are of one piece, up to a quarter of the capacity (<code>maxPiece</code>). <code>createBroadcast(name, capacity, maxSubscribers, maxStall)</code> returns the publisher, a connection whose sends go to every joined subscriber and the broadcast's one handle. A subscriber joins with <code>joinBroadcast</code>, on a thread of its own, and the publisher's process admits it on a thread of the library's, so no call of the publisher's waits for it (the publisher's own thread may join too, even with <code>joinBroadcastSync</code>). The publisher waits for its subscriber (<code>publisher.waitForMembers(1)</code> resolves to the count once at least one has joined; at <code>FIPC_TIMEOUT</code> or <code>FIPC_CANCELLED</code> the error's <code>count</code> is the count) before it sends <code>tick 1</code> to <code>tick 3</code>; closing the publisher ends the broadcast and frees its name. The subscriber joins gated (<code>SUBSCRIBER_GATED</code>), so it misses nothing (the publisher waits for it), and receives until <code>FIPC_DISCONNECTED</code>, which comes after the last message. A gated one that holds the publisher back for the broadcast's <code>maxStall</code> ms is unsubscribed (<code>FIPC_UNSUBSCRIBED</code>); leaving <code>maxStall</code> out never unsubscribes.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>publisher.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { createBroadcast } from "fipc";
+
+// 64 KiB of messages, up to 8 subscribers; one that holds the publisher back 5 s is dropped
+const publisher = createBroadcast("my_broadcast", 1 &lt;&lt; 16, 8, 5000);
+await publisher.waitForMembers(1); // waits for the first subscriber; the event loop runs meanwhile
+for (let i = 1; i &lt;= 3; i++) await publisher.send(`tick ${i}`);
+publisher.close(); // ends the broadcast: subscribers get FIPC_DISCONNECTED after the ticks</code></pre></div>
+      <div class="code"><div class="label"><span>subscriber.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { SUBSCRIBER_GATED, joinBroadcast } from "fipc";
+
+// gated: misses nothing (the publisher waits for it)
+const subscriber = await joinBroadcast("my_broadcast", SUBSCRIBER_GATED, 5000);
+for (;;) {
+  let tick;
+  try {
+    tick = await subscriber.receive();
+  } catch (error) {
+    if (error.code === "FIPC_DISCONNECTED") break; // the publisher closed
+    throw error;
+  }
+  console.log(tick.toString()); // tick 1, tick 2, tick 3
+}
+subscriber.close();</code></pre></div>
+    </div>
+    <div class="cols">
+      <div class="stack">
+        <p>A lossy subscriber (<code>SUBSCRIBER_LOSSY</code>) never holds the publisher back. One that falls a lap behind fails a receive with <code>FIPC_OVERRUN</code> instead of a message, the number of messages it lost in <code>error.lost</code> (a number, exact up to 2<sup>53</sup>), and the next receive goes on from a recent message.</p>
+        <p>Subscribers receive copies (<code>receive</code>, <code>receiveInto</code>); <code>receiveAcquire</code> fails with <code>FIPC_INVALID</code> on them: the publisher may unsubscribe a gated one at any moment, which makes the memory of a message held in place inaccessible, and reading a view then would crash the process. The publisher may publish in place.</p>
+      </div>
+      <div class="code"><div class="label"><span>a lossy subscriber</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">try {
+  handle(await subscriber.receive());
+} catch (error) {
+  if (error.code !== "FIPC_OVERRUN") throw error; // "FIPC_DISCONNECTED": the broadcast ended
+  console.log(`${error.lost} messages lost`); // fell a lap behind: the next receive goes on from a recent message
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="queue" aria-labelledby="h-q">
+    <div class="plate-head"><h2 id="h-q">Work queue</h2><span class="eyebrow">many producers, each message to one consumer</span></div>
+    <p class="intro">A work queue takes messages from up to 63 producers and hands each to one of up to 64 consumers, in any processes of the user. Each producer has a ring of its own; a consumer takes a message of any producer, and the queue promises no order. Messages are of one piece, up to a quarter of the capacity (<code>maxPiece</code>), and wait in the queue until a consumer takes them. Each message goes to one consumer, and again, to another, only if that consumer's process ends before acknowledging it (<a href="#queue-delivery">delivery</a>, below). Here the producer owns the queue (<code>createQueue(name, capacity, maxProducers, maxConsumers)</code> returns it) and joins it as a producer (<code>joinQueue</code> with <code>PRODUCER</code>): the owner's process admits every joiner on a thread of the library's, its own included, so one thread can own a queue and produce, even with the <code>Sync</code> calls. It sends <code>job 1</code> to <code>job 3</code>, which wait in the queue, then waits for the consumer (<code>queue.waitForMembers(CONSUMER, 1)</code>; a role left out, or 0, counts both), so the two start in either order. Closing the queue ends it: the consumer receives what is left, then <code>FIPC_DISCONNECTED</code>, and a producer's sends fail with <code>FIPC_DISCONNECTED</code> from then on; a producer's or a consumer's close never ends it. <b>The garbage collector never closes a queue</b>: a queue lives until <code>close()</code> or the end of its process (of its worker thread, for one a <code>Worker</code> created), and dropping the object doesn't end it. A consumer receives copied or in place (<code>receiveAcquire</code>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>producer.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc";
+
+// 4 KiB of messages per producer, 1 producer and 1 consumer: this process owns the queue and is its producer
+const queue = createQueue("my_queue", 4096, 1, 1);
+const producer = await joinQueue("my_queue", PRODUCER); // this process admits it, as any member
+for (let i = 1; i &lt;= 3; i++) await producer.send(`job ${i}`); // waits in the queue until a consumer takes it
+await queue.waitForMembers(CONSUMER, 1); // waits for the consumer to join; the event loop runs meanwhile
+producer.close();
+queue.close(); // ends the queue: the consumer gets FIPC_DISCONNECTED after the jobs</code></pre></div>
+      <div class="code"><div class="label"><span>consumer.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { CONSUMER, joinQueue } from "fipc";
+
+const consumer = await joinQueue("my_queue", CONSUMER, 5000);
+for (;;) {
+  let job;
+  try {
+    job = await consumer.receive();
+  } catch (error) {
+    if (error.code === "FIPC_DISCONNECTED") break; // the queue ended
+    throw error;
+  }
+  console.log(job.toString()); // job 1, job 2, job 3
+}
+consumer.close();</code></pre></div>
+    </div>
+    <p class="intro" id="queue-delivery" style="margin-top:22px"><b>Delivery.</b> Each message goes to one consumer. It goes again, to another consumer, only if the process of the consumer that took it ends before acknowledging it, and when a consumer acknowledges is its own choice, not the queue's. A message received in place is acknowledged at its release (or the consumer's next receive, or its close).</p>
+    <div class="table-wrap">
+      <table class="data prose stack-sm">
+        <thead><tr><th scope="col">How the consumer receives</th><th scope="col">When it acknowledges</th><th scope="col">If its process ends</th><th scope="col">What the application gets</th></tr></thead>
+        <tbody>
+          <tr><td data-k="how the consumer receives"><code>receive()</code> or <code>receiveInto()</code> (copying)</td><td data-k="when it acknowledges">inside the call, before it returns</td><td data-k="if its process ends">inside the call: the message goes to another consumer, and this one never saw it; after the call returned: it doesn't go again</td><td data-k="what the application gets"><b>at most once</b>: no duplicates</td></tr>
+          <tr><td data-k="how the consumer receives"><code>receiveAcquire()</code>, then <code>receiveRelease()</code> at once, then the work</td><td data-k="when it acknowledges">at the release, before the work</td><td data-k="if its process ends">as above</td><td data-k="what the application gets"><b>at most once</b>: no duplicates</td></tr>
+          <tr><td data-k="how the consumer receives"><code>receiveAcquire()</code>, the work, then <code>receiveRelease()</code></td><td data-k="when it acknowledges">at the release, after the work</td><td data-k="if its process ends">before the release: the message goes to another consumer</td><td data-k="what the application gets"><b>at least once</b>: a duplicate is possible, so the work must be idempotent</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="plain" style="margin-top:14px">
+      <li><b>Choose by the work, per consumer.</b> Work that may safely run twice (rendering, a computation, re-indexing, converting a file) acknowledges after it; work whose effects must never repeat (a payment, an email, a motor command) acknowledges before it.</li>
+      <li><b>Not covered:</b> a consumer that hangs while its process runs (there are no timeouts, by design); the owner's process, with which the queue ends; a reboot. A consumer holds at most one unacknowledged message at a time, the one received in place.</li>
+      <li><b>A message that goes again comes in no set order,</b> after messages its producer sent later: the queue promises no order anyway.</li>
+      <li><b>A message held in place holds back its producer's room</b> until its release: a consumer that acknowledges after a long job keeps that message's room, and so the room of the producer's messages after it, until then.</li>
+      <li><b>A message that crashes every consumer that takes it,</b> acknowledged after the work, goes to each consumer in turn, with no limit: acknowledge before the work where that can happen.</li>
+    </ul>
+  </section>
+
+  <section class="plate" id="service" aria-labelledby="h-svc">
+    <div class="plate-head"><h2 id="h-svc">Service</h2><span class="eyebrow">many clients, a pool of servers, with replies</span></div>
+    <p class="intro">A service takes requests from up to 64 clients and hands each to one of up to 64 servers, in any processes of the user; the server that took a request replies to it, and the reply goes back to the client that sent it. A server waits for the requests of every client at once (one <code>receive</code>), and the servers of a pool share the load: each takes the next request of any client. Each client has a ring of its own, which holds its requests and the room for their replies, so a server never waits for a client. Requests and replies are of one piece, 1 to <code>maxMessage</code> bytes, the owner's choice (<code>maxPiece</code>). Here the server creates the service (<code>createService(name, capacity, maxMessage, maxClients, maxServers)</code> returns it), joins it as its server (<code>joinService</code> with <code>SERVER</code>: the owner's process admits every joiner on a thread of the library's, its own included, so one thread can own a service and serve) and answers three requests with their uppercase. The client joins (<code>CLIENT</code>) and calls <code>ping 1</code> to <code>ping 3</code>: <code>call</code> sends a request and resolves to its reply. <b>The service's <code>close()</code> ends it</b>: clients' sends and servers' receives fail with <code>FIPC_DISCONNECTED</code>, and a client receives the replies that came before the end, then <code>FIPC_DISCONNECTED</code>; a client's or a server's close never ends the service. <b>The garbage collector never closes a service</b>: a service lives until <code>close()</code> or the end of its process (of its worker thread, for one a <code>Worker</code> created), and dropping the object doesn't end it.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>service_server.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { SERVER, createService, joinService } from "fipc";
+
+// 4 KiB per client, requests and replies of up to 256 bytes, 1 client and 1 server: this process owns the service
+// and is its server
+const service = createService("my_service", 4096, 256, 1, 1);
+const server = await joinService("my_service", SERVER, 5000); // this process admits it, as any member
+for (let i = 0; i &lt; 3; i++) { // three requests, then the end
+  const request = await server.receive(); // the next request of any client
+  await server.send(request.toString().toUpperCase()); // the reply goes to its client, and never waits
+}
+server.close();
+service.close(); // ends the service: the client still receives the replies sent</code></pre></div>
+      <div class="code"><div class="label"><span>service_client.mjs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">import { CLIENT, joinService } from "fipc";
+
+const client = await joinService("my_service", CLIENT, 5000);
+for (let i = 1; i &lt;= 3; i++) {
+  // sends the request and resolves to its reply; FipcError FIPC_ABANDONED if the server ended before it replied
+  const reply = await client.call(`ping ${i}`);
+  console.log(reply.toString()); // PING 1, PING 2, PING 3
+}
+client.close();</code></pre></div>
+    </div>
+    <ul class="plain" style="margin-top:22px">
+      <li><b>A client's replies come in the order of its requests.</b> <code>send(request)</code> sends a request, and a receive (<code>receive</code>, <code>receiveInto</code>, or in place <code>receiveAcquire</code> until <code>receiveRelease</code>) resolves to the reply to its oldest request whose reply it hasn't received yet, whichever server replies first. A client may send several requests before it receives (as many as its ring has room for: each holds its length rounded up to 64 bytes, plus <code>maxMessage</code> rounded up to 64, until its reply has been received), and the servers work on them at once. A receive that times out or is cancelled leaves its reply to come: the next receive returns it.</li>
+      <li><b><code>client.call(request, timeout)</code> never resolves to another request's reply.</b> A call checks its request first: <code>FIPC_INVALID</code> for an empty one, <code>FIPC_TOO_LARGE</code> over <code>maxPiece</code>, a <code>TypeError</code> for another type, at once, even while a reply is owed. Then a call on a cancelled connection fails with <code>FIPC_CANCELLED</code> at once, whatever its timeout, and sends nothing: it could never receive the reply. The connection keeps count of the replies still owed: a call whose receive timed out or was cancelled leaves its reply owed, and the next call first receives and drops that reply (at most one is owed, since every call drops it first; an <code>FIPC_ABANDONED</code> in its place counts too), within its own timeout and before it sends. A call that had to drop an owed reply or wait for its turn first sends its request only if its timeout has time left: once a positive timeout has run out, it fails with <code>FIPC_TIMEOUT</code> without sending, so no server sees that request; with <code>NO_WAIT</code> no step waits, and it sends if there is room. After a call that gave up, a plain <code>receive</code> returns that call's late reply (or <code>FIPC_ABANDONED</code>) first: replies come in request order. A call fails with <code>FIPC_INVALID</code> while a request sent with <code>send</code> (or <code>sendCommit</code>) still has its reply to be received: that reply is yours, so receive it first; on any connection other than a service's client it fails with <code>FIPC_INVALID</code> too. <code>callSync</code> calls on the calling thread.</li>
+      <li><b>Calls run one at a time,</b> in the order they were made: a call made while another is pending waits for its turn, its timeout counting from when it was made: it fails with <code>FIPC_TIMEOUT</code> if that runs out first (and with <code>FIPC_CANCELLED</code> at a <code>cancel</code> or a <code>close</code>), and the calls behind it keep their order. <code>Promise.all</code> of several calls resolves to each one's own reply. Meanwhile the client's other sends and receives fail with <code>ERR_FIPC_BUSY</code>, and so does a call while an async receive of yours is pending: either would race the call for its reply.</li>
+      <li><b>A server holds one request at a time.</b> <code>receive</code> takes the next request of any client (each client's in the order it sent them), and <code>send(reply)</code> replies to it and never waits; until then its receives fail with <code>FIPC_INVALID</code>, and a reply with no request held fails with <code>FIPC_INVALID</code>. A request received in place stays valid until a reply (<code>send</code> or <code>sendCommit</code>) gives it up, which detaches its view, so the reply may be written from it; a reply refused with the request still held (empty, too large, or after the service's end) leaves the view until the close; <code>receiveRelease</code> does nothing. A reply while an async receive of the server's is pending fails with <code>ERR_FIPC_BUSY</code>. A reply to a client that has left is dropped.</li>
+      <li><b><code>FIPC_ABANDONED</code>:</b> a client's receive (or call) fails with <code>FIPC_ABANDONED</code> when the server that took the request ended before it replied: it closed its connection, or its process (or worker thread) ended. The request counts as answered, and the next receive returns the next reply. An abandoned request may or may not have been carried out; the service never sends it again, and the client decides whether to.</li>
+      <li><b>The owner's service:</b> <code>service.waitForMembers(role, atLeast, timeout)</code> resolves to the number of members of the role (<code>CLIENT</code> or <code>SERVER</code>; left out, or 0, both) joined once there are at least <code>atLeast</code>; <code>service.cancel()</code> makes its waits fail with <code>FIPC_CANCELLED</code>. Clients wait while no server is joined, and servers while no client is.</li>
+      <li><b>Not covered:</b> a server that hangs while its process runs (there are no timeouts, by design: its client waits, within its own timeouts); the owner's process, with which the service ends.</li>
+    </ul>
+    <div class="code" style="margin-top:14px"><div class="label"><span>a call whose server ended before it replied</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">let reply;
+try {
+  reply = await client.call(request);
+} catch (error) {
+  if (error.code !== "FIPC_ABANDONED") throw error; // "FIPC_DISCONNECTED": the service ended
+  reply = await client.call(request); // its server ended before it replied: send it again, if it may run twice
+}</code></pre></div>
+  </section>
+
+  <section class="plate" id="interop" aria-labelledby="h-interop">
+    <div class="plate-head"><h2 id="h-interop">Any language on the other end</h2><span class="eyebrow">one protocol</span></div>
+    <p class="intro">The <code>server.mjs</code> and <code>client.mjs</code> above work with a peer in any of the ten languages: <a href="index.html#interop">every pair of languages is tested</a>. A Node.js process can hand CPU-heavy work to a worker written in Rust, C++ or Python, or serve as the front end of a native engine, without a socket.</p>
+  </section>
+
+  <section class="plate" id="lifetimes" aria-labelledby="h-life">
+    <div class="plate-head"><h2 id="h-life">Lifetimes and worker threads</h2><span class="eyebrow">close, cancel, the garbage collector</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>conn.cancel()</code> makes every call of the connection that waits, then or later, fail with <code>FIPC_CANCELLED</code>. <code>conn.close()</code> ends the connection: pending calls fail with <code>FIPC_CANCELLED</code>, every view is detached, and the peer gets <code>FIPC_DISCONNECTED</code> once it has received what this side sent. <code>listener.close()</code> stops listening, frees the name and leaves the connections it accepted open. Both work with <code>using</code> (<code>Symbol.dispose</code>), as a queue and a service do.</p>
+        <p>A listener or connection the program drops is closed when the garbage collector finalizes it; those still open when a worker thread or the process ends are closed then. A queue or a service is the exception: the collector never closes it, since its use lives in its members, so it lives until <code>close()</code> or that end. An idle connection doesn't keep the process alive; a pending call does, until it settles, as a socket would.</p>
+      </div>
+      <div class="stack">
+        <p>A listener, queue, service or connection belongs to the JavaScript thread that made it, the main thread or a <code>Worker</code>: each worker opens connections of its own. A client and its server may even run in one process, since <code>await listener.accept()</code> and <code>await connectStream(name)</code> each wait on a thread of their own. There is no heartbeat and no timeout: a paused or hung peer is not reported, a crashed or killed one as soon as its process has ended.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="setup" aria-labelledby="h-setup">
+    <div class="plate-head"><h2 id="h-setup">Node.js, Bun and Deno</h2><span class="eyebrow">Node-API 8 · x86-64-v3 · ARM64 Linux · Apple Silicon</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>The binding is one Node-API addon, the interface all three runtimes load, so one package serves them: Node.js 22 or newer, Bun, and Deno 2 (which needs <code>--allow-ffi</code> to load an addon, and <code>--allow-read</code> and <code>--allow-env</code> for the binding to find it). The package carries the addon and the native library for every platform in <code>prebuilds/</code>, picks the right one when it loads, and runs no install script. Types come with it, for <code>import</code> and for <code>require</code>.</p>
+        <p>The binding looks for its addon and the library in the folder <code>FASTIPC_LIB_DIR</code> names, then (in a checkout of the repository) its <code>zig-out</code> build, then the package's <code>prebuilds/&lt;platform&gt;-&lt;arch&gt;/</code>, and for the library last, the system's search. <code>fipc.library</code> and <code>fipc.addon</code> say which files it loaded; the library stays loaded until the process ends.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>run the client in each runtime</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-bash">node client.mjs
+bun client.mjs
+deno run --allow-ffi --allow-read --allow-env client.mjs</code></pre></div>
+        <div class="code"><div class="label"><span>CommonJS</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-javascript">const { createStream, connectStream } = require("fipc");</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="reference" aria-labelledby="h-ref">
+    <div class="plate-head"><h2 id="h-ref">Reference</h2><span class="eyebrow"><a href="https://github.com/fastipc/fastipc/blob/main/bindings/js/index.d.ts">index.d.ts</a></span></div>
+    <div class="table-wrap">
+      <table class="data stack-sm">
+        <thead><tr><th scope="col">Call</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>createStream(name, capacity)</code></td><td>Claims the name for a stream: its listener; <code>FIPC_ADDR_IN_USE</code> if another stream, broadcast, queue or service holds it.</td></tr>
+          <tr><td><code>listener.accept(timeout)</code> · <code>acceptSync(timeout)</code></td><td>Sets the next client's connection up: a <code>Connection</code>. One client at a time: close it before the next accept. <code>acceptSync(NO_WAIT)</code> polls.</td></tr>
+          <tr><td><code>listener.cancel()</code> · <code>close()</code> · <code>name</code> · <code>closed</code></td><td>Cancel waiting accepts · stop listening and free the name; accepted connections stay open.</td></tr>
+          <tr class="sep"><td><code>connectStream(name, timeout)</code> · <code>connectStreamSync</code></td><td>Connects to the server of the stream on the name, waiting for it to create the stream and accept.</td></tr>
+          <tr><td><code>conn.send(data, timeout)</code> · <code>sendSync</code></td><td>Sends one message of any size: a string, a TypedArray, a DataView or an ArrayBuffer.</td></tr>
+          <tr><td><code>conn.receive(timeout)</code> · <code>receiveSync</code></td><td>Receives one message of any size, as a new <code>Buffer</code>.</td></tr>
+          <tr><td><code>conn.receiveInto(buffer, timeout)</code> · <code>receiveIntoSync</code></td><td>Receives into your buffer; its length. <code>FIPC_TOO_LARGE</code> (with <code>error.length</code>) if it doesn't fit.</td></tr>
+          <tr><td><code>conn.sendMany(messages, timeout)</code> · <code>receiveMany(maxCount, timeout)</code> · <code>sendManySync</code> · <code>receiveManySync</code></td><td>Batches: send an array of messages, published together, and resolve to how many went (on a failure, the error's <code>sent</code>) · receive every message already there, up to <code>maxCount</code>, as an array of <code>Buffer</code>s. Batch both ends.</td></tr>
+          <tr><td><code>conn.sendAcquire(length, timeout)</code> · <code>sendAcquireSync</code> · <code>sendCommit(length)</code></td><td>Zero-copy send: a <code>Uint8Array</code> over the ring, then publish.</td></tr>
+          <tr><td><code>conn.receiveAcquire(timeout)</code> · <code>receiveAcquireSync</code> · <code>receiveRelease()</code></td><td>Zero-copy receive: a <code>Uint8Array</code> over the message, then free its room.</td></tr>
+          <tr><td><code>conn.maxPiece</code> · <code>ended</code> · <code>closed</code> · <code>cancel()</code> · <code>close()</code></td><td>The zero-copy limit · whether a call failed with <code>FIPC_DISCONNECTED</code> · whether it is closed · cancel waiting calls · end the connection.</td></tr>
+          <tr class="sep"><td><code>createBroadcast(name, capacity, maxSubscribers, maxStall)</code></td><td>Claims the name for a broadcast: the publisher, a connection whose sends go to every joined subscriber. Closing it ends the broadcast.</td></tr>
+          <tr><td><code>joinBroadcast(name, role, timeout)</code> · <code>joinBroadcastSync</code></td><td>Joins the broadcast as <code>SUBSCRIBER_LOSSY</code> or <code>SUBSCRIBER_GATED</code>: a connection that receives copies. The publisher's process admits it by itself.</td></tr>
+          <tr><td><code>publisher.waitForMembers(atLeast, timeout)</code> · <code>waitForMembersSync</code></td><td>The number of subscribers joined, once at least <code>atLeast</code> are (<code>error.count</code> at a timeout or a cancel).</td></tr>
+          <tr class="sep"><td><code>createQueue(name, capacity, maxProducers, maxConsumers)</code></td><td>Claims the name for a work queue: a <code>Queue</code>. It lives until <code>close()</code> or the end of its process; the garbage collector never closes it.</td></tr>
+          <tr><td><code>joinQueue(name, role, timeout)</code> · <code>joinQueueSync</code></td><td>Joins the queue as a <code>PRODUCER</code>, which sends, or a <code>CONSUMER</code>, which receives each message no other consumer took, then <code>FIPC_DISCONNECTED</code> once the queue has ended. The owner's process admits it by itself.</td></tr>
+          <tr><td><code>queue.waitForMembers(role, atLeast, timeout)</code> · <code>waitForMembersSync</code></td><td>The number of members of the role joined (<code>undefined</code> or 0: both roles), once at least <code>atLeast</code> are (<code>error.count</code> at a timeout, a cancel or the queue's end).</td></tr>
+          <tr><td><code>queue.cancel()</code> · <code>close()</code> · <code>name</code> · <code>closed</code></td><td>Cancel waiting <code>waitForMembers</code> calls · end the queue: producers get <code>FIPC_DISCONNECTED</code>, consumers what is left, then <code>FIPC_DISCONNECTED</code>.</td></tr>
+          <tr class="sep"><td><code>createService(name, capacity, maxMessage, maxClients, maxServers)</code></td><td>Claims the name for a service: a <code>Service</code>. It lives until <code>close()</code> or the end of its process; the garbage collector never closes it.</td></tr>
+          <tr><td><code>joinService(name, role, timeout)</code> · <code>joinServiceSync</code></td><td>Joins the service as a <code>CLIENT</code>, whose sends are requests and whose receives their replies, in order (or <code>FIPC_ABANDONED</code>), or a <code>SERVER</code>, which receives the next request of any client and replies with a send. The owner's process admits it by itself.</td></tr>
+          <tr><td><code>client.call(request, timeout)</code> · <code>callSync</code></td><td>Sends a request and resolves to its reply; <code>FIPC_ABANDONED</code> if its server ended first. A call never resolves to another request's reply; calls run one at a time.</td></tr>
+          <tr><td><code>service.waitForMembers(role, atLeast, timeout)</code> · <code>waitForMembersSync</code></td><td>The number of members of the role joined (<code>undefined</code> or 0: both roles), once at least <code>atLeast</code> are (<code>error.count</code> at a timeout, a cancel or the service's end).</td></tr>
+          <tr><td><code>service.cancel()</code> · <code>close()</code> · <code>name</code> · <code>closed</code></td><td>Cancel waiting <code>waitForMembers</code> calls · end the service: clients' sends and servers' receives get <code>FIPC_DISCONNECTED</code>, clients the replies that came first, then <code>FIPC_DISCONNECTED</code>.</td></tr>
+          <tr class="sep"><td><code>NO_WAIT</code> · <code>FOREVER</code> · <code>SUBSCRIBER_LOSSY</code> · <code>SUBSCRIBER_GATED</code> · <code>PRODUCER</code> · <code>CONSUMER</code> · <code>CLIENT</code> · <code>SERVER</code></td><td>0 · -1 · 1 · 2 · 3 · 4 · 5 · 6.</td></tr>
+          <tr><td><code>FipcError</code> · <code>Result</code> · <code>resultStr(result)</code></td><td>The error (<code>code</code>, <code>result</code>, <code>call</code>, <code>length</code>, <code>lost</code>, <code>count</code>) · the results by name · the C name of one.</td></tr>
+          <tr><td><code>library</code> · <code>addon</code> · <code>version</code></td><td>The paths of the library and the addon loaded · <code>"1.0.0"</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Measured through this binding on Node.js 22, copied 16-byte messages run at 2.1 to 2.5 million per second between two processes through the async calls and about twice that through the <code>Sync</code> calls, and 64 KiB messages at 350,000 to 360,000 per second (<a href="performance.html#bindings">details</a>).</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js?v=42823dbe"></script>
+</body>
+</html>

@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC for C#: shared-memory IPC for .NET (Fipc on NuGet)</title>
+<meta name="description" content="Shared-memory IPC in C# and .NET: dotnet add package Fipc, then FipcStream, FipcBroadcast, FipcQueue and FipcService for messages, broadcasts, work queues and services between processes.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/csharp.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC for C#: shared-memory IPC for .NET (Fipc on NuGet)">
+<meta property="og:description" content="Shared-memory IPC in C# and .NET: dotnet add package Fipc, then FipcStream, FipcBroadcast, FipcQueue and FipcService for messages, broadcasts, work queues and services between processes.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/csharp.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC for C#: shared-memory IPC for .NET (Fipc on NuGet)">
+<meta name="twitter:description" content="Shared-memory IPC in C# and .NET: dotnet add package Fipc, then FipcStream, FipcBroadcast, FipcQueue and FipcService for messages, broadcasts, work queues and services between processes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css?v=5c1851ba">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html" aria-current="page">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="performance.html">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">Fipc on NuGet · using FastIpc</span>
+    <h1>C#</h1>
+    <p class="lede">Two layers. <code>FipcStream</code>, <code>FipcBroadcast</code>, <code>FipcQueue</code> and <code>FipcService</code> make <code>FipcListener</code>, <code>FipcConnection</code>, <code>FipcQueue</code> and <code>FipcService</code> objects on SafeHandles that are safe to dispose from any thread. Underneath, <code>Fipc</code> declares the C API one to one over <code>IntPtr</code> handles, for the hottest loops. The package targets .NET Standard 2.1 and carries the native libraries for Linux x64 and ARM64 (glibc 2.34+), Windows x64 and macOS 14.4+ on Apple Silicon (osx-arm64).</p>
+    <div class="install" style="max-width:520px"><span class="lang">Install</span><code>dotnet add package Fipc</code><button class="copy" type="button" data-copy="dotnet add package Fipc">copy</button></div>
+    <nav class="toc" aria-label="On this page">
+      <a href="#hello">Server and client</a><a href="#messages">Messages</a><a href="#results">Setup and results</a><a href="#zerocopy">Zero-copy</a><a href="#batches">Batches</a><a href="#broadcast">Broadcast</a><a href="#queue">Work queue</a><a href="#service">Service</a><a href="#production">In production</a><a href="#games">Frame loops</a><a href="#threads">Threads and Dispose</a><a href="#raw">The raw layer</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="hello" aria-labelledby="h-hello">
+    <div class="plate-head"><h2 id="h-hello">Server and client</h2><span class="eyebrow">two processes, one name</span></div>
+    <p class="intro">A stream's server creates a name (<code>FipcStream.Create</code>) and accepts one client at a time on its listener; a client connects to the name (<code>FipcStream.Connect</code>), which waits for the server to create the stream and accept, so the two run in different processes or on different threads. Each program is a console project of its own (<code>dotnet new console</code>) with the <code>Fipc</code> package. Timeouts are int milliseconds, the last parameter: 0 doesn't wait, <code>Fipc.Forever</code> (−1, like <code>Timeout.Infinite</code>) waits for ever, and is the default where a call waits. The pair makes the exchange every example on this site makes, the message <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client (<a href="index.html#interop">every pair of languages is tested</a>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>Server/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// rings of 1 MiB each way; Accept waits for a client
+using var listener = FipcStream.Create("my_channel", 1 &lt;&lt; 20);
+using var conn = listener.Accept();
+if (conn.Receive(out byte[] message) == FipcResult.Ok)
+{
+    string upper = Encoding.UTF8.GetString(message)
+        .ToUpperInvariant();
+    conn.Send(Encoding.UTF8.GetBytes(upper));
+}</code></pre></div>
+      <div class="code"><div class="label"><span>Client/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// waits up to 5 s for the server, else throws
+using var conn = FipcStream.Connect("my_channel", 5000);
+conn.Send("ping"u8);
+conn.Receive(out byte[] reply);
+Console.WriteLine(Encoding.UTF8.GetString(reply));  // PING</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="messages" aria-labelledby="h-msg">
+    <div class="plate-head"><h2 id="h-msg">Messages</h2><span class="eyebrow">bytes of any size, no header</span></div>
+    <p class="intro">A connection carries messages: <code>Send</code> takes a message of any size, and <code>Receive</code> returns each one whole in a new array (or fills your span). This server echoes every message back until its client leaves, which ends its next <code>Receive</code> with <code>Disconnected</code>.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>echo server</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">// rings of 1 MiB each way
+using var listener = FipcStream.Create("demo", 1 &lt;&lt; 20);
+using var conn = listener.Accept();
+while (conn.Receive(out byte[] msg) == FipcResult.Ok)
+    conn.Send(msg);   // echo
+// Disconnected: the client closed or exited</code></pre></div>
+      <div class="code"><div class="label"><span>echo client</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using var conn = FipcStream.Connect("demo", 5000);
+conn.Send("hello"u8);
+if (conn.Receive(out byte[] reply) == FipcResult.Ok)
+    Console.WriteLine(Encoding.UTF8.GetString(reply));</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="results" aria-labelledby="h-res">
+    <div class="plate-head"><h2 id="h-res">Setup throws, traffic returns results</h2><span class="eyebrow">FipcException, FipcResult</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p>Setup throws: a create, connect or join, and the listener's <code>Accept()</code>, return their object or throw a <code>FipcException</code>, whose <code>Result</code> says why (<code>AddrInUse</code>, <code>Timeout</code>, ...). It happens once per connection, so an exception's cost doesn't matter there. Catch only the failure you expect, with <code>catch (FipcException e) when (e.Result == ...)</code>, and let the rest propagate: this client gives up after 5 s without a server, and a server of another version or user (<code>Invalid</code>) ends it.</p>
+        <p>Everything after setup returns a <code>FipcResult</code>, where an exception would cost about as much as a round trip: <code>Ok</code>, <code>Timeout</code>, <code>Disconnected</code>, <code>Cancelled</code>, <code>TooLarge</code> or <code>Invalid</code>, and on a broadcast <code>Overrun</code> (a lossy subscriber lost messages: <code>LostMessages</code> says how many) or <code>Unsubscribed</code>, and on a service <code>Abandoned</code> (the request's server ended before it replied). A loop that polls for clients calls <code>listener.Accept(out var conn, 0)</code>, which returns its result too. A mistake throws as .NET's own calls do, such as a call after <code>Dispose</code> (<code>ObjectDisposedException</code>).</p>
+      </div>
+      <div class="code"><div class="label"><span>a client: the failure it expects</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static int Ping()
+{
+    FipcConnection conn;
+    try
+    {
+        conn = FipcStream.Connect("orders", timeoutMs: 5000);
+    }
+    catch (FipcException e) when (e.Result == FipcResult.Timeout)
+    {
+        Console.Error.WriteLine("no server on 'orders' within 5 s");
+        return 2;
+    }
+    // any other FipcException (Invalid: a server of another version or user) propagates
+    using (conn)
+    {
+        if (conn.Send("ping"u8) != FipcResult.Ok || conn.Receive(out byte[] reply) != FipcResult.Ok)
+            return 1;   // the server left
+        Console.WriteLine(Encoding.UTF8.GetString(reply));
+    }
+    return 0;
+}</code></pre></div>
+    </div>
+    <div class="cols">
+      <div class="stack">
+        <p><b>Every result an arm.</b> Write each loop's decision as a switch <em>expression</em> over the <code>FipcResult</code>, with an arm for every named result and no <code>_</code> arm. The compiler checks switch expressions, never statements, and with these two settings a missing result fails the build: a result added in a later version breaks every such switch until it is handled. An unnamed value (an int cast to the enum) throws <code>SwitchExpressionException</code>, so its warning, CS8524, is off.</p>
+        <p>The arms sort the results into a loop's normal endings (<code>Disconnected</code>, <code>Cancelled</code>), what it recovers from (<code>TooLarge</code>, <code>Overrun</code>, <code>Abandoned</code>, <code>Unsubscribed</code>) and the rest, bugs that throw. <a href="#production">In production</a> has a loop of each kind. <code>UnreachableException</code> is .NET 7 and later: under Unity (netstandard2.1) throw an <code>InvalidOperationException</code>.</p>
+      </div>
+      <div class="stack">
+        <div class="code"><div class="label"><span>the project file</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-xml">&lt;PropertyGroup&gt;
+  &lt;WarningsAsErrors&gt;$(WarningsAsErrors);CS8509&lt;/WarningsAsErrors&gt; &lt;!-- a FipcResult with no arm fails the build --&gt;
+  &lt;NoWarn&gt;$(NoWarn);CS8524&lt;/NoWarn&gt; &lt;!-- an unnamed value throws SwitchExpressionException --&gt;
+&lt;/PropertyGroup&gt;</code></pre></div>
+        <div class="code"><div class="label"><span>every loop&#x27;s last arm</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static Exception Unexpected(string call, FipcResult result) =&gt;
+    new UnreachableException($"{call}: {Fipc.ResultStr(result)}");</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plate" id="zerocopy" aria-labelledby="h-zc">
+    <div class="plate-head"><h2 id="h-zc">Zero-copy</h2><span class="eyebrow">up to conn.MaxPiece bytes</span></div>
+    <p class="intro">Write the message into a <code>Span&lt;byte&gt;</code> of the ring and commit it; read a <code>ReadOnlySpan&lt;byte&gt;</code> of the ring and release it. A span stays valid until its commit or release. A message longer than <code>MaxPiece</code> gets <code>TooLarge</code> from <code>SendAcquire</code>: the copying <code>Send</code> takes it, in pieces.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>send in place, else in pieces</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static FipcResult SendFrame(FipcConnection conn, Frame frame)
+{
+    FipcResult result = conn.SendAcquire(frame.Size, out Span&lt;byte&gt; room);   // room in the ring
+    if (result == FipcResult.Ok)
+        return conn.SendCommit(frame.EncodeInto(room));   // publishes what it wrote; never waits
+    if (result == FipcResult.TooLarge)
+        return conn.Send(frame.ToArray());   // over MaxPiece: the copying Send takes it in pieces
+    return result;   // Timeout, Disconnected or Cancelled: the caller's to decide
+}</code></pre></div>
+      <div class="code"><div class="label"><span>receive in place</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">if (conn.ReceiveAcquire(out ReadOnlySpan&lt;byte&gt; msg)
+    == FipcResult.Ok)
+{
+    Handle(msg);            // read-only, in the ring
+    conn.ReceiveRelease();  // frees its room
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="batches" aria-labelledby="h-batch">
+    <div class="plate-head"><h2 id="h-batch">Batches</h2><span class="eyebrow">many messages per call, both ends</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>SendMany(messages, out int sent, timeoutMs)</code> sends a span of messages (<code>byte[]</code> or <code>ReadOnlyMemory&lt;byte&gt;</code>) in order and publishes them together, with at most one wake of the receivers; the timeout bounds the whole call (<code>Fipc.NoWait</code>: only what fits now). Every message is checked before any goes, and <code>sent</code> says how many went, at every result.</p>
+        <p><code>ReceiveMany(buffer, lengths, out int count, timeoutMs)</code> waits for the next message, then takes every further one already there that fits <code>buffer</code>, packed back to back, their lengths in <code>lengths</code>; <code>ReceiveMany(out byte[][] messages, maxCount, timeoutMs)</code> returns them as arrays. Any result but <code>Ok</code> is the first message's, as <code>Receive</code> returns it. A broadcast's subscriber takes those its publisher has moved past; a service's client sends a batch of requests (owed as its sends are) and receives their replies in order; a server's batches return <code>Invalid</code>. <b>Batch both ends</b>: a receiver that takes one message per call falls behind a batching sender.</p>
+      </div>
+      <div class="code"><div class="label"><span>a batch each way</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">byte[][] batch = { "one"u8.ToArray(), "two"u8.ToArray() };
+conn.SendMany(batch, out int sent);
+
+var buf = new byte[65536];
+var lengths = new int[64];
+if (peer.ReceiveMany(buf, lengths, out int count)
+    == FipcResult.Ok)
+{
+    int at = 0;
+    for (int i = 0; i &lt; count; at += lengths[i++])
+        Handle(buf.AsSpan(at, lengths[i]));
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="broadcast" aria-labelledby="h-bc">
+    <div class="plate-head"><h2 id="h-bc">Broadcast</h2><span class="eyebrow">one publisher, many subscribers</span></div>
+    <p class="intro">A broadcast sends every message of one publisher to each of its subscribers, in any processes of the user; each message is stored once, in memory every subscriber maps. Messages are of one piece, up to a quarter of the capacity (<code>MaxPiece</code>). <code>FipcBroadcast.Create</code> returns the publisher, a <code>FipcConnection</code> and the broadcast's one handle; its <code>Dispose</code> ends the broadcast and frees the name. The publisher's process admits each subscriber by itself, on a thread of the library's: the publisher only waits for the first one (<code>publisher.WaitForMembers(1, out int count, ...)</code>; <code>count</code> holds the count at a <code>Timeout</code> too) before it sends <code>tick 1</code> to <code>tick 3</code>. The subscriber joins gated (<code>FipcBroadcast.Join</code> with <code>FipcSubscriberRole.Gated</code>), so it misses nothing (the publisher waits for it), may receive in place (<code>ReceiveAcquire</code>), and receives until <code>Disconnected</code>, which comes after the last message. A lossy subscriber (<code>FipcSubscriberRole.Lossy</code>) never holds the publisher back: one that falls a lap behind gets <code>Overrun</code>, and the connection's <code>LostMessages</code> (or the span receive's length) says how many messages it lost. A gated one that holds the publisher back for the broadcast's <code>maxStallMs</code> is unsubscribed (<code>Unsubscribed</code>).</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>Publisher/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// 64 KiB of messages, up to 8 subscribers; one that holds
+// the publisher back 5 s is dropped
+using (var publisher = FipcBroadcast.Create("my_broadcast",
+           1 &lt;&lt; 16, 8, 5000))
+{
+    // waits for the first subscriber
+    if (publisher.WaitForMembers(1, out _) != FipcResult.Ok)
+        return 1;
+    for (int i = 1; i &lt;= 3; i++)
+        publisher.Send(Encoding.UTF8.GetBytes($"tick {i}"));
+}
+// disposing the publisher ends the broadcast: subscribers
+// get Disconnected after the ticks
+return 0;</code></pre></div>
+      <div class="code"><div class="label"><span>Subscriber/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// gated: misses nothing (the publisher waits for it)
+using var sub = FipcBroadcast.Join("my_broadcast",
+    FipcSubscriberRole.Gated, 5000);
+FipcResult result;
+while ((result = sub.Receive(out byte[] tick))
+       == FipcResult.Ok)
+    Console.WriteLine(Encoding.UTF8.GetString(tick));
+// tick 1, tick 2, tick 3, then Disconnected: the
+// publisher closed
+return result == FipcResult.Disconnected ? 0 : 1;</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="queue" aria-labelledby="h-q">
+    <div class="plate-head"><h2 id="h-q">Work queue</h2><span class="eyebrow">many producers, each message to one consumer</span></div>
+    <p class="intro">A work queue takes messages from up to 63 producers and hands each to one of up to 64 consumers, in any processes of the user. Each producer has a ring of its own; a consumer takes a message of any producer, and the queue promises no order. Messages are of one piece, up to a quarter of the capacity (<code>MaxPiece</code>), and wait in the queue until a consumer takes them. Each message goes to one consumer, and again, to another, only if that consumer's process ends before acknowledging it (<a href="#queue-delivery">delivery</a>, below). Here the producer creates the queue (<code>FipcQueue.Create</code>: a <code>FipcQueue</code>), joins it as its producer (<code>FipcQueue.Join</code> with <code>FipcQueueRole.Producer</code>: the owner's process admits every joiner by itself, its own included), sends <code>job 1</code> to <code>job 3</code>, which wait in the queue, and waits for the consumer (<code>queue.WaitForMembers(FipcQueueRole.Consumer, 1, ...)</code>; <code>null</code> counts both roles). The queue's <code>Dispose</code> ends it: the consumer receives what is left, then <code>Disconnected</code>, and a producer's sends return <code>Disconnected</code> from then on. <b>A queue lives until <code>Dispose</code> or the end of its process; dropping the object doesn't end it</b>: unlike this binding's other handles, a <code>FipcQueue</code> has no finalizer, as its use lives in its members, in this process and in others. Producers and consumers of other processes join with <code>FipcQueue.Join</code> (<code>FipcQueueRole.Producer</code>, <code>FipcQueueRole.Consumer</code>); a producer's or a consumer's <code>Dispose</code> never ends the queue.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>Producer/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// 4 KiB of messages per producer, 1 producer and 1 consumer:
+// this process owns the queue and is its producer
+using (var queue = FipcQueue.Create("my_queue", 4096, 1, 1))
+using (var producer = FipcQueue.Join("my_queue",
+           FipcQueueRole.Producer, 5000))
+{
+    for (int i = 1; i &lt;= 3; i++)
+    {
+        // waits in the queue until a consumer takes it
+        if (producer.Send(Encoding.UTF8.GetBytes($"job {i}"))
+            != FipcResult.Ok)
+            return 1;
+    }
+    // waits for the consumer to join
+    if (queue.WaitForMembers(FipcQueueRole.Consumer, 1, out _)
+        != FipcResult.Ok)
+        return 1;
+}
+// disposing the queue ends it: the consumer gets
+// Disconnected after the jobs
+return 0;</code></pre></div>
+      <div class="code"><div class="label"><span>Consumer/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+using var consumer = FipcQueue.Join("my_queue",
+    FipcQueueRole.Consumer, 5000);
+FipcResult result;
+while ((result = consumer.Receive(out byte[] job))
+       == FipcResult.Ok)
+    Console.WriteLine(Encoding.UTF8.GetString(job));
+// job 1, job 2, job 3, then Disconnected: the queue
+// ended
+return result == FipcResult.Disconnected ? 0 : 1;</code></pre></div>
+    </div>
+    <p class="intro" id="queue-delivery" style="margin-top:22px"><b>Delivery.</b> Each message goes to one consumer. It goes again, to another consumer, only if the process of the consumer that took it ends before acknowledging it, and when a consumer acknowledges is its own choice, not the queue's. A message received in place is acknowledged at its release (or the consumer's next receive, or its close).</p>
+    <div class="table-wrap">
+      <table class="data prose stack-sm">
+        <thead><tr><th scope="col">How the consumer receives</th><th scope="col">When it acknowledges</th><th scope="col">If its process ends</th><th scope="col">What the application gets</th></tr></thead>
+        <tbody>
+          <tr><td data-k="how the consumer receives"><code>Receive</code> (copying)</td><td data-k="when it acknowledges">inside the call, before it returns</td><td data-k="if its process ends">inside the call: the message goes to another consumer, and this one never saw it; after the call returned: it doesn't go again</td><td data-k="what the application gets"><b>at most once</b>: no duplicates</td></tr>
+          <tr><td data-k="how the consumer receives"><code>ReceiveAcquire</code>, then <code>ReceiveRelease</code> at once, then the work</td><td data-k="when it acknowledges">at the release, before the work</td><td data-k="if its process ends">as above</td><td data-k="what the application gets"><b>at most once</b>: no duplicates</td></tr>
+          <tr><td data-k="how the consumer receives"><code>ReceiveAcquire</code>, the work, then <code>ReceiveRelease</code></td><td data-k="when it acknowledges">at the release, after the work</td><td data-k="if its process ends">before the release: the message goes to another consumer</td><td data-k="what the application gets"><b>at least once</b>: a duplicate is possible, so the work must be idempotent</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="plain" style="margin-top:14px">
+      <li><b>Choose by the work, per consumer.</b> Work that may safely run twice (rendering, a computation, re-indexing, converting a file) acknowledges after it; work whose effects must never repeat (a payment, an email, a motor command) acknowledges before it.</li>
+      <li><b>Not covered:</b> a consumer that hangs while its process runs (there are no timeouts, by design); the owner's process, with which the queue ends; a reboot. A consumer holds at most one unacknowledged message at a time, the one received in place.</li>
+      <li><b>A message that goes again comes in no set order,</b> after messages its producer sent later: the queue promises no order anyway.</li>
+      <li><b>A message held in place holds back its producer's room</b> until its release: a consumer that acknowledges after a long job keeps that message's room, and so the room of the producer's messages after it, until then.</li>
+      <li><b>A message that crashes every consumer that takes it,</b> acknowledged after the work, goes to each consumer in turn, with no limit: acknowledge before the work where that can happen.</li>
+    </ul>
+  </section>
+
+  <section class="plate" id="service" aria-labelledby="h-svc">
+    <div class="plate-head"><h2 id="h-svc">Service</h2><span class="eyebrow">many clients, a pool of servers, with replies</span></div>
+    <p class="intro">A service takes requests from up to 64 clients and hands each to one of up to 64 servers, in any processes of the user; the server that took a request replies to it, and the reply goes back to the client that sent it. A server waits for the requests of every client at once (one <code>Receive</code>), and the servers of a pool share the load: each takes the next request of any client. Each client has a ring of its own, which holds its requests and the room for their replies, so a server never waits for a client. Requests and replies are of one piece, 1 to <code>maxMessage</code> bytes, the owner's choice (<code>MaxPiece</code>). Here the server creates the service (<code>FipcService.Create</code>: a <code>FipcService</code>), joins it as its server (<code>FipcService.Join</code> with <code>FipcServiceRole.Server</code>: the owner's process admits every joiner by itself, its own included) and answers three requests with their uppercase. The client joins (<code>FipcServiceRole.Client</code>) and calls <code>ping 1</code> to <code>ping 3</code>: <code>Call</code> sends a request and receives its reply. <b>The service's <code>Dispose</code> ends it</b>: clients' sends and servers' receives return <code>Disconnected</code>, and a client receives the replies that came before the end, then <code>Disconnected</code>; a client's or a server's <code>Dispose</code> never ends the service (a server's answers the request it holds <code>Abandoned</code>). A <code>FipcService</code> has no finalizer, as a <code>FipcQueue</code> has none: a service lives until <code>Dispose</code> or the end of its process, and dropping the object doesn't end it.</p>
+    <div class="cols-2">
+      <div class="code"><div class="label"><span>ServiceServer/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+// 4 KiB per client, requests and replies of up to 256 bytes,
+// 1 client and 1 server: this process owns the service and
+// is its server
+using (var service = FipcService.Create("my_service", 4096,
+           256, 1, 1))
+using (var server = FipcService.Join("my_service",
+           FipcServiceRole.Server, 5000))
+{
+    // three requests, then the end
+    for (int i = 1; i &lt;= 3; i++)
+    {
+        // the next request of any client
+        if (server.Receive(out byte[] request) != FipcResult.Ok)
+            return 1;
+        string upper = Encoding.UTF8.GetString(request)
+            .ToUpperInvariant();
+        // the reply goes to its client, and never waits
+        if (server.Send(Encoding.UTF8.GetBytes(upper),
+                Fipc.NoWait) != FipcResult.Ok)
+            return 1;
+    }
+}
+// disposing the service ends it: the client still receives
+// the replies sent
+return 0;</code></pre></div>
+      <div class="code"><div class="label"><span>ServiceClient/Program.cs</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">using System.Text;
+using FastIpc;
+
+using var client = FipcService.Join("my_service",
+    FipcServiceRole.Client, 5000);
+for (int i = 1; i &lt;= 3; i++)
+{
+    // sends the request and returns its reply; Abandoned if
+    // the server ended before it replied
+    if (client.Call(Encoding.UTF8.GetBytes($"ping {i}"),
+            out byte[] reply) != FipcResult.Ok)
+        return 1;
+    // PING 1, PING 2, PING 3
+    Console.WriteLine(Encoding.UTF8.GetString(reply));
+}
+return 0;</code></pre></div>
+    </div>
+    <ul class="plain" style="margin-top:22px">
+      <li><b>A client's replies come in the order of its requests.</b> <code>Send(request, ...)</code> sends a request, and <code>Receive</code> (into a span or a new array, or in place <code>ReceiveAcquire</code> until <code>ReceiveRelease</code>) receives the reply to its oldest request whose reply it hasn't received yet, whichever server replies first. A client may send several requests before it receives (as many as its ring has room for: each holds its length rounded up to 64 bytes, plus <code>maxMessage</code> rounded up to 64, until its reply has been received), and the servers work on them at once. A receive that times out or is cancelled leaves its reply to come: the next receive returns it.</li>
+      <li><b><code>Call(request, out byte[] reply, timeoutMs)</code> never returns another request's reply.</b> A call checks its request first: <code>Invalid</code> for an empty one, <code>TooLarge</code> over <code>MaxPiece</code>, at once, even while a reply is owed. Then a call on a cancelled connection returns <code>Cancelled</code> at once, whatever its timeout, and sends nothing: it could never receive the reply. The connection keeps count of the replies still owed: a call whose receive timed out or was cancelled leaves its reply owed, and the next call first receives and drops that reply (at most one is owed, since every call drops it first; an <code>Abandoned</code> in its place counts too), within its own timeout and before it sends. A call that had to drop an owed reply first sends its request only if its timeout has time left: once a positive timeout has run out, it returns <code>Timeout</code> without sending, so no server sees that request; with <code>NoWait</code> (0) no step waits, and it sends if there is room. After a call that gave up, a plain <code>Receive</code> returns that call's late reply (or <code>Abandoned</code>) first: replies come in request order. A call returns <code>Invalid</code> while a request sent with <code>Send</code> (or <code>SendCommit</code>) still has its reply to be received: that reply is yours, so receive it first; on any connection other than a service's client it returns <code>Invalid</code> too. A call sends and receives, so no other thread may send or receive on the connection meanwhile.</li>
+      <li><b>A server holds one request at a time.</b> <code>Receive</code> takes the next request of any client (each client's in the order it sent them), and <code>Send(reply, ...)</code> replies to it and never waits; until then its receives return <code>Invalid</code>, and a reply with no request held returns <code>Invalid</code>. A request received in place stays valid until the reply's <code>Send</code> or <code>SendCommit</code>, which ends its span (so does <code>ReceiveRelease</code>, the next receive, or <code>Dispose</code> on the receiving thread; a <code>ReceiveRelease</code> leaves the request held until its reply). A server's <code>Dispose</code> answers a request it hasn't replied to <code>Abandoned</code>: one held in place, at its span's end. A reply to a client that has left is dropped. A server may receive on one thread and reply on another.</li>
+      <li><b><code>Abandoned</code>:</b> a client's receive (or call) returns it when the server that took the request ended before it replied: it disposed its connection, or its process ended. The request counts as answered, and the next receive returns the next reply. An abandoned request may or may not have been carried out; the service never sends it again, and the client decides whether to.</li>
+      <li><b>The owner's service:</b> <code>service.WaitForMembers(role, atLeast, out int count, timeoutMs)</code> waits until that many members of the role (<code>FipcServiceRole.Client</code>, <code>FipcServiceRole.Server</code>, or <code>null</code> for both) have joined; <code>service.Cancel()</code> makes its waits return <code>Cancelled</code>, from any thread. Clients wait while no server is joined, and servers while no client is.</li>
+      <li><b>Not covered:</b> a server that hangs while its process runs (there are no timeouts, by design: its client waits, within its own timeouts); the owner's process, with which the service ends.</li>
+    </ul>
+  </section>
+
+  <section class="plate" id="production" aria-labelledby="h-prod">
+    <div class="plate-head"><h2 id="h-prod">In production: a stream server</h2><span class="eyebrow">one client after another, stopped by a token</span></div>
+    <p class="intro">A server that runs for good serves one client after another on its listener, and stops when its <code>CancellationToken</code> is cancelled (connect Ctrl+C to a <code>CancellationTokenSource</code>): <code>token.Register(listener.Cancel)</code> makes the waiting <code>Accept()</code> throw <code>Cancelled</code>, and the registration made for each connection makes its waiting receive return <code>Cancelled</code>. <code>Serve</code> reuses one buffer and grows it for a message that doesn't fit (<code>TooLarge</code> takes nothing, so the next receive gets the message), and returns at the client's end or the cancel. Its client is the <a href="#results">one above</a>. Every block from here on is compiled and run by the binding's tests.</p>
+    <div class="stack">
+      <div class="code"><div class="label"><span>RunServer</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void RunServer(CancellationToken token)
+{
+    using var listener = FipcStream.Create("orders", 1 &lt;&lt; 20);
+    using var stopListening = token.Register(listener.Cancel);
+    try
+    {
+        while (true)
+        {
+            using var conn = listener.Accept();   // the next client
+            using var stopServing = token.Register(conn.Cancel);
+            Serve(conn);
+        }
+    }
+    catch (FipcException e) when (e.Result == FipcResult.Cancelled)
+    {
+        // the token cancelled the listener: shutting down
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>Serve</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void Serve(FipcConnection conn)
+{
+    var buffer = new byte[64 * 1024];   // reused: no allocation per message
+    while (true)
+    {
+        FipcResult result = conn.Receive(buffer, out int length);
+        bool more = result switch
+        {
+            FipcResult.Ok =&gt; Reply(conn, buffer.AsSpan(0, length)),
+            FipcResult.TooLarge =&gt; Grow(ref buffer, length),   // nothing was taken: again
+            FipcResult.Disconnected =&gt; false,   // the client left: accept the next
+            FipcResult.Cancelled =&gt; false,      // shutting down
+            FipcResult.Invalid =&gt; throw Unexpected("Receive", result),   // a bug: two receiving threads
+            FipcResult.Timeout or FipcResult.NoMemory or FipcResult.AddrInUse or FipcResult.Overrun
+                or FipcResult.Unsubscribed or FipcResult.Abandoned
+                =&gt; throw Unexpected("Receive", result),   // never on a stream, waiting for ever
+        };
+        if (!more)
+            return;
+    }
+}
+
+static bool Grow(ref byte[] buffer, int needed)
+{
+    buffer = new byte[needed];
+    return true;
+}
+
+static bool Reply(FipcConnection conn, ReadOnlySpan&lt;byte&gt; request)
+{
+    FipcResult result = conn.Send(Respond(request));
+    return result switch
+    {
+        FipcResult.Ok =&gt; true,
+        FipcResult.Disconnected or FipcResult.Cancelled =&gt; false,
+        FipcResult.Timeout or FipcResult.TooLarge or FipcResult.Invalid or FipcResult.NoMemory
+            or FipcResult.AddrInUse or FipcResult.Overrun or FipcResult.Unsubscribed
+            or FipcResult.Abandoned =&gt; throw Unexpected("Send", result),
+    };
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="games" aria-labelledby="h-games">
+    <div class="plate-head"><h2 id="h-games">Games and frame loops</h2><span class="eyebrow">never block a frame</span></div>
+    <p class="intro">A frame loop never waits. Each frame, <code>Tick</code> lets a client in with the polling <code>Accept(out conn, Fipc.NoWait)</code>, which returns its result instead of throwing (a client takes one or two frames to get in), then takes every message that came, with <code>Fipc.NoWait</code>, until <code>Timeout</code>: nothing more this frame. A message longer than the buffer stays queued (<code>TooLarge</code>, with its length), so the buffer grows to it and the same frame reads it. The client's end frees the slot for the next one.</p>
+    <div class="code"><div class="label"><span>GameEndpoint</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">sealed class GameEndpoint : IDisposable
+{
+    private readonly FipcListener _listener = FipcStream.Create("game", 1 &lt;&lt; 22);
+    private FipcConnection? _conn;
+    private byte[] _buffer = new byte[64 * 1024];
+
+    public void Tick()   // once per frame: takes what came, never waits
+    {
+        if (_conn is null &amp;&amp; !TryAccept())
+            return;
+        while (true)
+        {
+            FipcResult result = _conn!.Receive(_buffer, out int length, Fipc.NoWait);
+            bool more = result switch
+            {
+                FipcResult.Ok =&gt; Dispatch(_buffer.AsSpan(0, length)),
+                FipcResult.TooLarge =&gt; Grow(ref _buffer, length),   // stays queued: read it now
+                FipcResult.Timeout =&gt; false,        // nothing more this frame
+                FipcResult.Disconnected =&gt; Drop(),  // the client left: free the slot for the next
+                FipcResult.Cancelled =&gt; false,      // shutting down
+                FipcResult.Invalid or FipcResult.NoMemory or FipcResult.AddrInUse or FipcResult.Overrun
+                    or FipcResult.Unsubscribed or FipcResult.Abandoned
+                    =&gt; throw Unexpected("Receive", result),
+            };
+            if (!more)
+                return;
+        }
+    }
+
+    private bool TryAccept()
+    {
+        FipcResult result = _listener.Accept(out _conn, Fipc.NoWait);   // the polling form: never throws
+        return result switch
+        {
+            FipcResult.Ok =&gt; true,
+            FipcResult.Timeout or FipcResult.Cancelled =&gt; false,   // no client yet, or shutting down
+            FipcResult.NoMemory =&gt; throw Unexpected("Accept", result),   // failed for good: create it again
+            FipcResult.Invalid or FipcResult.Disconnected or FipcResult.TooLarge or FipcResult.AddrInUse
+                or FipcResult.Overrun or FipcResult.Unsubscribed or FipcResult.Abandoned
+                =&gt; throw Unexpected("Accept", result),
+        };
+    }
+
+    private bool Drop()
+    {
+        _conn!.Dispose();
+        _conn = null;
+        return false;
+    }
+
+    public void Dispose()
+    {
+        _conn?.Dispose();
+        _listener.Dispose();
+    }
+}</code></pre></div>
+  </section>
+
+  <section class="plate" id="prod-broadcast" aria-labelledby="h-prod-bc">
+    <div class="plate-head"><h2 id="h-prod-bc">In production: broadcast</h2><span class="eyebrow">a publisher, a lossy subscriber, a gated one</span></div>
+    <p class="intro">The publisher waits up to 10 s for two subscribers, then sends to whoever joined. The lossy subscriber's buffer holds the longest message (<code>MaxPiece</code>), so it never gets <code>TooLarge</code>; one that falls a lap behind gets <code>Overrun</code>, and <code>LostMessages</code> says how many ticks it missed. The gated subscriber misses nothing and reads each tick in place, which holds the publisher back until its release; one that holds it back past <code>maxStallMs</code> gets <code>Unsubscribed</code>, for good.</p>
+    <div class="stack">
+      <div class="code"><div class="label"><span>Publish</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void Publish(IEnumerable&lt;byte[]&gt; ticks)
+{
+    // the publisher's connection is the broadcast: disposing it ends the broadcast
+    using var publisher = FipcBroadcast.Create("ticks", 1 &lt;&lt; 20, maxSubscribers: 16, maxStallMs: 500);
+    if (publisher.WaitForMembers(atLeast: 2, out int joined, timeoutMs: 10_000) != FipcResult.Ok)
+        Console.Error.WriteLine($"starting with {joined} subscribers");
+    foreach (byte[] tick in ticks)
+    {
+        FipcResult result = publisher.Send(tick);   // to every subscriber joined now
+        bool more = result switch
+        {
+            FipcResult.Ok =&gt; true,
+            FipcResult.Cancelled =&gt; false,   // shutting down
+            FipcResult.TooLarge or FipcResult.Invalid    // over publisher.MaxPiece, or empty
+                =&gt; throw new ArgumentException(Fipc.ResultStr(result), nameof(ticks)),
+            FipcResult.Timeout or FipcResult.Disconnected or FipcResult.NoMemory or FipcResult.AddrInUse
+                or FipcResult.Overrun or FipcResult.Unsubscribed or FipcResult.Abandoned
+                =&gt; throw Unexpected("Send", result),
+        };
+        if (!more)
+            return;
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>WatchTicks</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void WatchTicks()
+{
+    // lossy: never holds the publisher back, and may miss ticks
+    using var sub = FipcBroadcast.Join("ticks", FipcSubscriberRole.Lossy);
+    var buffer = new byte[sub.MaxPiece];   // the longest message: never TooLarge
+    while (true)
+    {
+        FipcResult result = sub.Receive(buffer, out int length);
+        bool more = result switch
+        {
+            FipcResult.Ok =&gt; Show(buffer.AsSpan(0, length)),
+            FipcResult.Overrun =&gt; Missed(sub.LostMessages),   // a lap behind: goes on from a recent tick
+            FipcResult.Disconnected =&gt; false,   // the publisher ended the broadcast
+            FipcResult.Cancelled =&gt; false,      // shutting down
+            FipcResult.Timeout or FipcResult.TooLarge or FipcResult.Invalid or FipcResult.NoMemory
+                or FipcResult.AddrInUse or FipcResult.Unsubscribed or FipcResult.Abandoned
+                =&gt; throw Unexpected("Receive", result),
+        };
+        if (!more)
+            return;
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>AuditTicks</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void AuditTicks()
+{
+    // gated: misses nothing (the publisher waits for it), so it may read in place, with no copy
+    using var audit = FipcBroadcast.Join("ticks", FipcSubscriberRole.Gated);
+    while (true)
+    {
+        FipcResult result = audit.ReceiveAcquire(out ReadOnlySpan&lt;byte&gt; tick);
+        bool more = result switch
+        {
+            FipcResult.Ok =&gt; Append(tick),   // holds the publisher back until the release: be quick
+            FipcResult.Unsubscribed =&gt; Dropped(),   // held it back past maxStallMs: out for good
+            FipcResult.Disconnected =&gt; false,   // the publisher ended the broadcast
+            FipcResult.Cancelled =&gt; false,      // shutting down
+            FipcResult.Timeout or FipcResult.TooLarge or FipcResult.Invalid or FipcResult.NoMemory
+                or FipcResult.AddrInUse or FipcResult.Overrun or FipcResult.Abandoned
+                =&gt; throw Unexpected("ReceiveAcquire", result),
+        };
+        audit.ReceiveRelease();   // frees the tick for the publisher; a no-op without one
+        if (!more)
+            return;
+    }
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="prod-queue" aria-labelledby="h-prod-q">
+    <div class="plate-head"><h2 id="h-prod-q">In production: work queue</h2><span class="eyebrow">a batch in, consumers stopped by a token</span></div>
+    <p class="intro">The owner joins its queue as a producer and sends the jobs in one batch, with one wake for all of them; <code>sent</code> says how many went, at every result, so a cancelled batch can put the rest back. Each consumer takes jobs until the queue ends (<code>Disconnected</code>, once nothing is left in it) or its token cancels it: <code>token.Register(consumer.Cancel)</code> makes the waiting receive return <code>Cancelled</code>.</p>
+    <div class="stack">
+      <div class="code"><div class="label"><span>Produce</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void Produce(byte[][] jobs)
+{
+    using var queue = FipcQueue.Create("jobs", 1 &lt;&lt; 20, maxProducers: 4, maxConsumers: 8);
+    using var producer = FipcQueue.Join("jobs", FipcQueueRole.Producer);   // the owner joins as any member
+    queue.WaitForMembers(FipcQueueRole.Consumer, atLeast: 1, out _);
+    FipcResult result = producer.SendMany(jobs, out int sent);   // one wake for the whole batch
+    _ = result switch
+    {
+        FipcResult.Ok =&gt; true,
+        FipcResult.Cancelled =&gt; Requeue(jobs.AsSpan(sent)),   // `sent` went, at every result
+        FipcResult.TooLarge or FipcResult.Invalid    // a job over MaxPiece, or empty: checked before any went
+            =&gt; throw new ArgumentException(Fipc.ResultStr(result), nameof(jobs)),
+        FipcResult.Timeout or FipcResult.Disconnected or FipcResult.NoMemory or FipcResult.AddrInUse
+            or FipcResult.Overrun or FipcResult.Unsubscribed or FipcResult.Abandoned
+            =&gt; throw Unexpected("SendMany", result),
+    };
+    // disposing the queue ends it: the consumers take what is left, then Disconnected
+}</code></pre></div>
+      <div class="code"><div class="label"><span>Consume</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void Consume(CancellationToken token)
+{
+    using var consumer = FipcQueue.Join("jobs", FipcQueueRole.Consumer);
+    using var stop = token.Register(consumer.Cancel);   // stops a waiting receive, from any thread
+    while (true)
+    {
+        FipcResult result = consumer.Receive(out byte[] job);
+        bool more = result switch
+        {
+            FipcResult.Ok =&gt; Work(job),   // each job goes to one consumer
+            FipcResult.Disconnected =&gt; false,   // the queue ended, and nothing is left in it
+            FipcResult.Cancelled =&gt; false,      // the token stopped it
+            FipcResult.Timeout or FipcResult.TooLarge or FipcResult.Invalid or FipcResult.NoMemory
+                or FipcResult.AddrInUse or FipcResult.Overrun or FipcResult.Unsubscribed
+                or FipcResult.Abandoned =&gt; throw Unexpected("Receive", result),
+        };
+        if (!more)
+            return;
+    }
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="prod-service" aria-labelledby="h-prod-svc">
+    <div class="plate-head"><h2 id="h-prod-svc">In production: service</h2><span class="eyebrow">a pool of servers, a client that asks again</span></div>
+    <p class="intro">The owner starts four servers and, when the token is cancelled, disposes the service: each server's receive then returns <code>Disconnected</code>, and the owner joins the threads. A server's join waits for a client, so each joins with a timeout and looks at the token between tries. A server reads each request in place, in its client's ring, and its reply, a <code>Send</code> that never waits, ends it. The client's <code>Quote</code> asks again after <code>Abandoned</code> (the request's server ended before it replied, and the request may or may not have run: ask again only what is safe to repeat), and gives up after a <code>Timeout</code>, whose late reply the next <code>Call</code> drops first.</p>
+    <div class="stack">
+      <div class="code"><div class="label"><span>RunPricing</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void RunPricing(CancellationToken token)
+{
+    using var service = FipcService.Create("pricing", 1 &lt;&lt; 20, maxMessage: 4096, maxClients: 64,
+        maxServers: 4);
+    var servers = new Thread[4];
+    for (int i = 0; i &lt; servers.Length; i++)
+        (servers[i] = new Thread(() =&gt; ServeQuotes(token))).Start();
+    token.WaitHandle.WaitOne();
+    service.Dispose();   // ends the service: each server's receive returns Disconnected
+    foreach (Thread server in servers)
+        server.Join();
+}</code></pre></div>
+      <div class="code"><div class="label"><span>ServeQuotes</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static void ServeQuotes(CancellationToken token)
+{
+    FipcConnection server;
+    while (true)
+    {
+        try
+        {
+            server = FipcService.Join("pricing", FipcServiceRole.Server, timeoutMs: 500);
+            break;
+        }
+        catch (FipcException e) when (e.Result == FipcResult.Timeout)
+        {
+            // a server's join waits for a client: look at the token now and then
+            if (token.IsCancellationRequested)
+                return;
+        }
+    }
+    using (server)
+    {
+        Span&lt;byte&gt; reply = stackalloc byte[4096];
+        while (true)
+        {
+            // the request is read in place, in its client's ring, until the reply
+            FipcResult result = server.ReceiveAcquire(out ReadOnlySpan&lt;byte&gt; request);
+            bool more = result switch
+            {
+                FipcResult.Ok =&gt; server.Send(reply[..Price(request, reply)]) == FipcResult.Ok,
+                FipcResult.Disconnected =&gt; false,   // the service ended
+                FipcResult.Cancelled =&gt; false,      // shutting down
+                FipcResult.Invalid =&gt; throw Unexpected("ReceiveAcquire", result),   // a request not replied to
+                FipcResult.Timeout or FipcResult.TooLarge or FipcResult.NoMemory or FipcResult.AddrInUse
+                    or FipcResult.Overrun or FipcResult.Unsubscribed or FipcResult.Abandoned
+                    =&gt; throw Unexpected("ReceiveAcquire", result),
+            };
+            if (!more)
+                return;
+        }
+    }
+}</code></pre></div>
+      <div class="code"><div class="label"><span>Quote</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">static decimal? Quote(FipcConnection client, string symbol)
+{
+    for (int attempt = 0; attempt &lt; 3; attempt++)
+    {
+        FipcResult result = client.Call(Encoding.UTF8.GetBytes(symbol), out byte[] reply, timeoutMs: 200);
+        bool again = result switch
+        {
+            FipcResult.Ok =&gt; false,
+            FipcResult.Abandoned =&gt; true,   // its server ended first: a quote is safe to ask again
+            FipcResult.Timeout =&gt; false,    // the reply stays owed: the next Call drops it first
+            FipcResult.Disconnected or FipcResult.Cancelled =&gt; false,   // the service ended, or stopping
+            FipcResult.TooLarge or FipcResult.Invalid    // checked before anything is sent
+                =&gt; throw new ArgumentException(Fipc.ResultStr(result), nameof(symbol)),
+            FipcResult.NoMemory or FipcResult.AddrInUse or FipcResult.Overrun or FipcResult.Unsubscribed
+                =&gt; throw Unexpected("Call", result),
+        };
+        if (result == FipcResult.Ok)
+            return ParsePrice(reply);
+        if (!again)
+            return null;
+    }
+    return null;
+}</code></pre></div>
+    </div>
+  </section>
+
+  <section class="plate" id="threads" aria-labelledby="h-thr">
+    <div class="plate-head"><h2 id="h-thr">Threads and Dispose</h2><span class="eyebrow">SafeHandle</span></div>
+    <ul class="plain">
+      <li>On a connection, one thread at a time sends and one receives; the two may run at once. <code>Cancel</code> and <code>Dispose</code> may be called from any thread, at any time.</li>
+      <li><code>Dispose</code> cancels the handle, so a waiting call returns <code>Cancelled</code>, and the native close runs once the calls in progress have returned. No call ever runs on a closed connection, and a zero-copy span stays valid until its commit or release (a service server's request held in place: until its reply), when the close then runs.</li>
+      <li>To stop an IO thread: <code>Dispose</code>, then join the thread with a timeout.</li>
+      <li>A <code>Disconnected</code> connection is final: dispose it, then accept or connect a new one.</li>
+      <li>A listener or a connection that is never disposed is closed by its finalizer once it is unreachable (a publisher's ends its broadcast). A <code>FipcQueue</code> or a <code>FipcService</code> has none: it lives until <code>Dispose</code> or the end of its process. Its <code>WaitForMembers</code>, <code>Cancel</code> and <code>Dispose</code> may be called from any thread.</li>
+    </ul>
+  </section>
+
+  <section class="plate" id="raw" aria-labelledby="h-raw">
+    <div class="plate-head"><h2 id="h-raw">The raw layer</h2><span class="eyebrow">static class Fipc</span></div>
+    <div class="cols">
+      <div class="stack">
+        <p><code>Fipc</code> declares the C API one to one, over <code>IntPtr</code> handles, pointers or spans. It costs nothing beyond the native call. Each object-layer call holds its SafeHandle, which costs about 15 ns a call, or about 30 ns per message sent and received (<a href="performance.html#bindings">measured</a>).</p>
+        <p>It enforces nothing either: <code>Close</code> needs the handle to itself (cancel, join the threads that use it, then close), and closing under a running call frees memory the call still uses.</p>
+      </div>
+      <div class="code"><div class="label"><span>raw calls</span><button class="copy" type="button">copy</button></div>
+<pre><code class="language-csharp">Fipc.StreamConnect("my_channel", out IntPtr conn, 5000);
+Fipc.Send(conn, "hello"u8, Fipc.Forever);
+Fipc.Close(conn);</code></pre></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="assets/site.js?v=42823dbe"></script>
+</body>
+</html>

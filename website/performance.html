@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FastIPC performance: IPC benchmarks against iceoryx2, Aeron, ZeroMQ, NNG, Boost.Interprocess and cpp-ipc</title>
+<meta name="description" content="Head-to-head IPC benchmarks: FastIPC against iceoryx2, Aeron, ZeroMQ, NNG, Boost.Interprocess, cpp-ipc and sockets, for streams, broadcasts, work queues and request-reply services, on Linux, Windows and macOS, x86-64 and ARM64, with the code to rerun them; and what each language binding costs.">
+<link rel="canonical" href="https://fastipc.github.io/fastipc/performance.html">
+<link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="FastIPC">
+<meta property="og:title" content="FastIPC performance: IPC benchmarks against iceoryx2, Aeron, ZeroMQ, NNG, Boost.Interprocess and cpp-ipc">
+<meta property="og:description" content="Head-to-head IPC benchmarks for streams, broadcasts, work queues and request-reply services, on Linux, Windows and macOS, x86-64 and ARM64, with the code to rerun them.">
+<meta property="og:url" content="https://fastipc.github.io/fastipc/performance.html">
+<meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
+<meta property="og:image:alt" content="The FastIPC logo">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FastIPC performance: IPC benchmarks against iceoryx2, Aeron, ZeroMQ, NNG, Boost.Interprocess and cpp-ipc">
+<meta name="twitter:description" content="Head-to-head IPC benchmarks for streams, broadcasts, work queues and request-reply services, on Linux, Windows and macOS, x86-64 and ARM64, with the code to rerun them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css?v=5c1851ba">
+<!-- generated:faq-ld -->
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "FAQPage",
+ "mainEntity": [
+  {
+   "@type": "Question",
+   "name": "What is the fastest IPC library?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "It depends on the pattern and the message. FastIPC is the fastest, or level with the fastest, in 28 of the 30 measurements of the case-by-case table; Aeron leads the other 2. Of the libraries here, only FastIPC has all four patterns (stream, broadcast, work queue and service) in shared memory. (Case by case.)"
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How does FastIPC compare with Aeron?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Aeron is the closest rival. FastIPC has the lower round-trip latency on Linux x86-64 and Windows, and the two are about even on macOS and Linux ARM64. FastIPC leads 16-byte one-way throughput on Windows, macOS and Linux ARM64, and Aeron leads on Linux x86-64 (by 12%). FastIPC leads it at 1 KiB on every platform here. Aeron also works across machines, over UDP. On one machine FastIPC is simpler to set up: Aeron needs a media driver running, as a process of its own or embedded in one of the applications. Either library can let an idle receiver sleep, but a sleeping Aeron receiver sees a new message only when its sleep ends, whereas FastIPC's sender wakes its receiver as soon as it sends. Aeron has no work queue or request-reply service. (Charts above; details in Aeron in detail.)"
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Is FastIPC faster than ZeroMQ?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes, in every one of the 72 measurements where both ran: a 16-byte round trip, for example, is 240 to 478 times as quick. ZeroMQ passes each message through a socket and its own I/O threads, while FastIPC writes it into memory both processes map. ZeroMQ also works across machines; FastIPC works within one."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How does FastIPC compare with iceoryx2?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Both are shared-memory libraries without a broker. FastIPC is faster in every one of the 68 measurements where both ran; its request-reply calls, for example, run 3.1 to 3.6 times as fast. iceoryx2 has no work queue and delivers each request to every server, so its servers don't share a load. It has events and a blackboard, and runs on more platforms (QNX, FreeBSD and others)."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How does FastIPC compare with NNG (nanomsg)?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "NNG passes each message through its own threads, and every hand-over between threads costs a wake-up, so it is far slower here: a 16-byte round trip is 195 to 1,077 times as quick with FastIPC. NNG works across machines; FastIPC works within one."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Is shared memory faster than a Unix domain socket?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. Here a 16-byte round trip through FastIPC's shared memory is 11 to 20 times as quick as over a Unix domain socket. A socket costs a system call and a copy through the kernel for every send and receive; shared memory needs neither once the connection is set up."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Can I run these benchmarks myself?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. bench/alternatives in the repository fetches and builds every library at the version shown and builds the harness with CMake, and run.py runs every case and writes the medians. The README there has the commands, and the method above says what each case does."
+   }
+  }
+ ]
+}
+</script>
+<!-- /generated:faq-ld -->
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="FastIPC home">
+      <img class="logo-light" src="assets/brand/fastipc-lockup-light.svg" alt="FastIPC" width="152" height="44">
+      <img class="logo-dark" src="assets/brand/fastipc-lockup-dark.svg" alt="FastIPC" width="152" height="44">
+      <span class="ver">v1.0.0</span>
+    </a>
+    <nav class="site" aria-label="Site">
+      <a href="index.html">Overview</a>
+      <a href="zig.html">Zig</a>
+      <a href="c.html">C</a>
+      <a href="cpp.html">C++</a>
+      <a href="python.html">Python</a>
+      <a href="csharp.html">C#</a>
+      <a href="java.html">Java</a>
+      <a href="rust.html">Rust</a>
+      <a href="lua.html">Lua</a>
+      <a href="js.html">JavaScript</a>
+      <a href="go.html">Go</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="performance.html" aria-current="page">Performance</a>
+      <a href="https://github.com/fastipc/fastipc">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
+    <span class="eyebrow">bench/alternatives · bench/zig</span>
+    <h1>Performance</h1>
+    <p class="lede">FastIPC, <a href="https://github.com/eclipse-iceoryx/iceoryx2">iceoryx2</a>, <a href="https://github.com/aeron-io/aeron">Aeron</a>, <a href="https://zeromq.org/">ZeroMQ</a>, <a href="https://nng.nanomsg.org/">NNG</a>, <a href="https://www.boost.org/doc/libs/release/doc/html/interprocess.html">Boost.Interprocess</a>, <a href="https://github.com/mutouyun/cpp-ipc">cpp-ipc</a> and the operating system's sockets, run through the same cases on the same machine: a stream between two processes, a broadcast to several, a work queue shared by producers and consumers, and a request-reply service. Every process does the same work with each library, and each library runs in its fastest configuration. The <a href="https://github.com/fastipc/fastipc/tree/main/bench/alternatives">harness</a> fetches and builds every library at a pinned version, and reruns all of it on your machine. Numbers from different machines don't compare, so every chart sets the libraries side by side on each machine. Below them: what to expect beyond these cases, and what each language's binding costs.</p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#stream">Stream</a><a href="#broadcast">Broadcast</a><a href="#queue">Work queue</a><a href="#service">Service</a><a href="#cases">Case by case</a><a href="#batched">Batched</a><a href="#libraries">The libraries</a><a href="#tables">Every case</a><a href="#method">Method</a><a href="#practice">In practice</a><a href="#bindings">By language</a><a href="#faq">FAQ</a>
+    </nav>
+  </div>
+
+  <section class="plate" id="stream" aria-labelledby="h-stream">
+    <div class="plate-head"><h2 id="h-stream">Stream: one process to another</h2><span class="eyebrow">stream-N · rtt-N</span></div>
+    <p class="intro">One sender, one receiver, each in a process of its own: messages per second one way, and the round trip when the receiver answers each message at once. A sender writes each message from its own buffer, and the receiver ends with it in its own; libraries that lend out shared memory have the receiver copy the message out of it.</p>
+    <!-- prose:stream -->
+    <div class="compare-charts">
+<!-- generated:chart-stream -->
+<div class="chart" role="figure" aria-label="Stream: 16-byte messages per second, one way">
+  <div class="chart-title"><h3>Stream: 16-byte messages per second, one way</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 50.3M (copying calls, polling receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6122)"></span><b>50.3M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 52.5M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6391)"></span><b>52.5M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 82.1M (copying calls, waiting receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>82.1M</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 72.4M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8817)"></span><b>72.4M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Aeron</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Aeron · Linux x86-64 · 56.5M (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6883)"></span><b>56.5M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></b></div>
+      <div class="bar wn" tabindex="0" data-tip="Aeron · Windows · 47.3M (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.5761)"></span><b>47.3M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Aeron · macOS · 57.6M (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7018)"></span><b>57.6M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Aeron · Linux ARM64 · 50.6M (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6158)"></span><b>50.6M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 7.84M (ipc://, polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0954)"></span><b>7.84M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 8.44M (ipc://, waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1028)"></span><b>8.44M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 7.38M (TCP, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0899)"></span><b>7.38M</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 9.73M (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1185)"></span><b>9.73M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Boost.Interprocess</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Boost.Interprocess · Linux x86-64 · 7.22M (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0879)"></span><b>7.22M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Boost.Interprocess · Windows · 3.57M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0435)"></span><b>3.57M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Boost.Interprocess · macOS · 10.2M (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1240)"></span><b>10.2M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Boost.Interprocess · Linux ARM64 · 5.82M (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0708)"></span><b>5.82M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 3.63M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0442)"></span><b>3.63M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 3.23M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0393)"></span><b>3.23M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 6.27M (polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0764)"></span><b>6.27M</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 5.59M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0680)"></span><b>5.59M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">cpp-ipc</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="cpp-ipc · Linux x86-64 · 2.34M (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0285)"></span><b>2.34M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="cpp-ipc · Windows · 1.01M (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0123)"></span><b>1.01M</b></div>
+      <div class="bar mc none"><b>—</b></div>
+      <div class="bar la" tabindex="0" data-tip="cpp-ipc · Linux ARM64 · 2.59M (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0315)"></span><b>2.59M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Unix socket</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Unix socket · Linux x86-64 · 2.17M (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0264)"></span><b>2.17M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Unix socket · Windows · 986.9K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0120)"></span><b>986.9K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Unix socket · macOS · 2.00M (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0243)"></span><b>2.00M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Unix socket · Linux ARM64 · 2.33M (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0283)"></span><b>2.33M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">TCP loopback</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="TCP loopback · Linux x86-64 · 558.8K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0068)"></span><b>558.8K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="TCP loopback · Windows · 115.2K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0014)"></span><b>115.2K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="TCP loopback · macOS · 548.6K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0067)"></span><b>548.6K</b></div>
+      <div class="bar la" tabindex="0" data-tip="TCP loopback · Linux ARM64 · 572.3K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0070)"></span><b>572.3K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 19.4K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0002)"></span><b>19.4K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 52.5K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0006)"></span><b>52.5K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 92.8K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0011)"></span><b>92.8K</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 135.4K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0016)"></span><b>135.4K</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-stream -->
+<!-- generated:chart-rtt -->
+<div class="chart" role="figure" aria-label="Round trip, 16 B, p50 (shorter is better; log scale)">
+  <div class="chart-title"><h3>Round trip, 16 B, p50 (shorter is better; log scale)</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 163 ns (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0677)"></span><b>163 ns</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 160 ns (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0655)"></span><b>160 ns</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 125 ns (copying calls, waiting receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0310)"></span><b>125 ns</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 125 ns (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0310)"></span><b>125 ns</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Aeron</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Aeron · Linux x86-64 · 192 ns (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0908)"></span><b>192 ns</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Aeron · Windows · 191 ns (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0898)"></span><b>191 ns</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Aeron · macOS · 125 ns (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0310)"></span><b>125 ns</b></div>
+      <div class="bar la" tabindex="0" data-tip="Aeron · Linux ARM64 · 125 ns (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0310)"></span><b>125 ns</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 854 ns (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2976)"></span><b>854 ns</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 897 ns (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3045)"></span><b>897 ns</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 583 ns (polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2448)"></span><b>583 ns</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 625 ns (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2544)"></span><b>625 ns</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Boost.Interprocess</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Boost.Interprocess · Linux x86-64 · 1.6 µs (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3846)"></span><b>1.6 µs</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Boost.Interprocess · Windows · 680 ns (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2660)"></span><b>680 ns</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Boost.Interprocess · macOS · 375 ns (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1835)"></span><b>375 ns</b></div>
+      <div class="bar la" tabindex="0" data-tip="Boost.Interprocess · Linux ARM64 · 1.5 µs (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3759)"></span><b>1.5 µs</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">cpp-ipc</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="cpp-ipc · Linux x86-64 · 1.2 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3456)"></span><b>1.2 µs</b></div>
+      <div class="bar wn" tabindex="0" data-tip="cpp-ipc · Windows · 2.3 µs (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4350)"></span><b>2.3 µs</b></div>
+      <div class="bar mc none"><b>—</b></div>
+      <div class="bar la" tabindex="0" data-tip="cpp-ipc · Linux ARM64 · 1.0 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3253)"></span><b>1.0 µs</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Unix socket</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Unix socket · Linux x86-64 · 1.7 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3972)"></span><b>1.7 µs</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Unix socket · Windows · 3.2 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4822)"></span><b>3.2 µs</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Unix socket · macOS · 1.5 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3797)"></span><b>1.5 µs</b></div>
+      <div class="bar la" tabindex="0" data-tip="Unix socket · Linux ARM64 · 1.6 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3834)"></span><b>1.6 µs</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">TCP loopback</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="TCP loopback · Linux x86-64 · 3.7 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.5023)"></span><b>3.7 µs</b></div>
+      <div class="bar wn" tabindex="0" data-tip="TCP loopback · Windows · 14 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6876)"></span><b>14 µs</b></div>
+      <div class="bar mc" tabindex="0" data-tip="TCP loopback · macOS · 9.0 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6252)"></span><b>9.0 µs</b></div>
+      <div class="bar la" tabindex="0" data-tip="TCP loopback · Linux ARM64 · 2.9 µs (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4662)"></span><b>2.9 µs</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 78 µs (ipc://, polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9240)"></span><b>78 µs</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 53 µs (ipc://, waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8709)"></span><b>53 µs</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 43 µs (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8427)"></span><b>43 µs</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 30 µs (ipc://, polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7919)"></span><b>30 µs</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 118 µs (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9813)"></span><b>118 µs</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 47 µs (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8551)"></span><b>47 µs</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 24 µs (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7628)"></span><b>24 µs</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 135 µs (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>135 µs</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-rtt -->
+<!-- generated:chart-stream-1k -->
+<div class="chart" role="figure" aria-label="Stream: 1 KiB messages per second, one way">
+  <div class="chart-title"><h3>Stream: 1 KiB messages per second, one way</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 28.8M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9625)"></span><b>28.8M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 30.0M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>30.0M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 29.5M (copying calls, waiting receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9833)"></span><b>29.5M</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 25.9M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8646)"></span><b>25.9M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Aeron</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Aeron · Linux x86-64 · 18.8M (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6269)"></span><b>18.8M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Aeron · Windows · 22.7M (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7592)"></span><b>22.7M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Aeron · macOS · 25.8M (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8618)"></span><b>25.8M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Aeron · Linux ARM64 · 23.2M (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7759)"></span><b>23.2M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 3.17M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1058)"></span><b>3.17M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 3.05M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1018)"></span><b>3.05M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 4.82M (polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1609)"></span><b>4.82M</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 4.82M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1609)"></span><b>4.82M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Boost.Interprocess</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Boost.Interprocess · Linux x86-64 · 1.85M (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0616)"></span><b>1.85M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Boost.Interprocess · Windows · 2.90M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0967)"></span><b>2.90M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Boost.Interprocess · macOS · 7.21M (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2408)"></span><b>7.21M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Boost.Interprocess · Linux ARM64 · 3.02M (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1008)"></span><b>3.02M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 1.68M (TCP, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0560)"></span><b>1.68M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 1.28M (ipc://, waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0426)"></span><b>1.28M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 2.40M (TCP, waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0802)"></span><b>2.40M</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 2.06M (TCP, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0688)"></span><b>2.06M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Unix socket</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Unix socket · Linux x86-64 · 1.85M (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0617)"></span><b>1.85M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Unix socket · Windows · 939.9K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0314)"></span><b>939.9K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Unix socket · macOS · 1.83M (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0609)"></span><b>1.83M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Unix socket · Linux ARM64 · 1.33M (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0442)"></span><b>1.33M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">cpp-ipc</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="cpp-ipc · Linux x86-64 · 691.2K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0231)"></span><b>691.2K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="cpp-ipc · Windows · 198.3K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0066)"></span><b>198.3K</b></div>
+      <div class="bar mc none"><b>—</b></div>
+      <div class="bar la" tabindex="0" data-tip="cpp-ipc · Linux ARM64 · 472.4K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0158)"></span><b>472.4K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">TCP loopback</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="TCP loopback · Linux x86-64 · 527.5K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0176)"></span><b>527.5K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="TCP loopback · Windows · 113.5K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0038)"></span><b>113.5K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="TCP loopback · macOS · 532.9K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0178)"></span><b>532.9K</b></div>
+      <div class="bar la" tabindex="0" data-tip="TCP loopback · Linux ARM64 · 512.8K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0171)"></span><b>512.8K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 18.3K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0006)"></span><b>18.3K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 49.9K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0017)"></span><b>49.9K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 87.6K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0029)"></span><b>87.6K</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 124.2K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0041)"></span><b>124.2K</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-stream-1k -->
+<!-- generated:chart-stream-64k -->
+<div class="chart" role="figure" aria-label="Stream: 64 KiB messages per second, one way">
+  <div class="chart-title"><h3>Stream: 64 KiB messages per second, one way</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 489.3K (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7402)"></span><b>489.3K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 492.7K (copying calls, polling receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7455)"></span><b>492.7K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 642.4K (copying calls, waiting receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9719)"></span><b>642.4K</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 661.0K (zero-copy calls, polling receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>661.0K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 411.0K (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6218)"></span><b>411.0K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 408.9K (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6187)"></span><b>408.9K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 408.4K (polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6178)"></span><b>408.4K</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 449.1K (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6794)"></span><b>449.1K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Aeron</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Aeron · Linux x86-64 · 190.8K (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2887)"></span><b>190.8K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Aeron · Windows · 216.7K (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3279)"></span><b>216.7K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Aeron · macOS · 249.6K (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3777)"></span><b>249.6K</b></div>
+      <div class="bar la" tabindex="0" data-tip="Aeron · Linux ARM64 · 230.7K (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3491)"></span><b>230.7K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">cpp-ipc</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="cpp-ipc · Linux x86-64 · 322.9K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4885)"></span><b>322.9K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="cpp-ipc · Windows · 221.3K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3348)"></span><b>221.3K</b></div>
+      <div class="bar mc none"><b>—</b></div>
+      <div class="bar la" tabindex="0" data-tip="cpp-ipc · Linux ARM64 · 79.1K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1197)"></span><b>79.1K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Boost.Interprocess</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Boost.Interprocess · Linux x86-64 · 54.4K (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0823)"></span><b>54.4K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Boost.Interprocess · Windows · 262.8K (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3976)"></span><b>262.8K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Boost.Interprocess · macOS · 298.8K (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4521)"></span><b>298.8K</b></div>
+      <div class="bar la" tabindex="0" data-tip="Boost.Interprocess · Linux ARM64 · 167.8K (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2539)"></span><b>167.8K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Unix socket</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Unix socket · Linux x86-64 · 167.1K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2528)"></span><b>167.1K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Unix socket · Windows · 196.5K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2973)"></span><b>196.5K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Unix socket · macOS · 100.4K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1519)"></span><b>100.4K</b></div>
+      <div class="bar la" tabindex="0" data-tip="Unix socket · Linux ARM64 · 156.3K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2365)"></span><b>156.3K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">TCP loopback</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="TCP loopback · Linux x86-64 · 118.2K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1788)"></span><b>118.2K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="TCP loopback · Windows · 52.1K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0788)"></span><b>52.1K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="TCP loopback · macOS · 130.6K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1975)"></span><b>130.6K</b></div>
+      <div class="bar la" tabindex="0" data-tip="TCP loopback · Linux ARM64 · 129.8K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1963)"></span><b>129.8K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 81.8K (TCP, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1237)"></span><b>81.8K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 55.3K (ipc://, waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0836)"></span><b>55.3K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 102.2K (TCP, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1547)"></span><b>102.2K</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 106.4K (TCP, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1610)"></span><b>106.4K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 16.6K (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0252)"></span><b>16.6K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 26.3K (TCP, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0399)"></span><b>26.3K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 45.9K (TCP, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0694)"></span><b>45.9K</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 35.9K (TCP, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0544)"></span><b>35.9K</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-stream-64k -->
+    </div>
+  </section>
+
+  <section class="plate" id="broadcast" aria-labelledby="h-bc">
+    <div class="plate-head"><h2 id="h-bc">Broadcast: one publisher, many subscribers</h2><span class="eyebrow">broadcast-S-lossless-N · broadcast-S-lossy-N</span></div>
+    <p class="intro">One publisher process and 1 or 4 subscriber processes; every subscriber receives every message. Lossless: a subscriber that falls behind holds the publisher back. Lossy: it loses messages instead, and the publisher never waits. The rate is the slowest subscriber's; a lossy library's figure counts the messages that arrived, and the share lost is beside it.</p>
+    <!-- prose:broadcast -->
+    <div class="compare-charts">
+<!-- generated:chart-broadcast -->
+<div class="chart" role="figure" aria-label="Broadcast to 4 subscribers, lossless: 16-byte messages per second">
+  <div class="chart-title"><h3>Broadcast to 4 subscribers, lossless: 16-byte messages per second</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 44.4M (copying calls, polling receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8767)"></span><b>44.4M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 38.3M (copying calls, polling receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7556)"></span><b>38.3M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 50.7M (copying calls, waiting receive, 32 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>50.7M</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 40.8M (copying calls, waiting receive, 32 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8048)"></span><b>40.8M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Aeron</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Aeron · Linux x86-64 · 45.6M (polling receive, 4 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8987)"></span><b>45.6M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></b></div>
+      <div class="bar wn" tabindex="0" data-tip="Aeron · Windows · 32.5M (polling receive, 512 KiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6411)"></span><b>32.5M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Aeron · macOS · 41.9M (polling receive, 32 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8258)"></span><b>41.9M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Aeron · Linux ARM64 · 23.8M (polling receive, 32 MiB window)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4697)"></span><b>23.8M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 1.36M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0269)"></span><b>1.36M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 1.29M (polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0255)"></span><b>1.29M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 972.2K (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0192)"></span><b>972.2K</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 1.51M (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0298)"></span><b>1.51M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">cpp-ipc</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="cpp-ipc · Linux x86-64 · 13.3K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0003)"></span><b>13.3K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="cpp-ipc · Windows · 45.1K (waiting receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0009)"></span><b>45.1K</b></div>
+      <div class="bar mc none"><b>—</b></div>
+      <div class="bar la" tabindex="0" data-tip="cpp-ipc · Linux ARM64 · 12.0K (polling receive)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0002)"></span><b>12.0K</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-broadcast -->
+<!-- generated:chart-broadcast-lossy -->
+<div class="chart" role="figure" aria-label="Broadcast to 4 subscribers, lossy: 16-byte messages received per second">
+  <div class="chart-title"><h3>Broadcast to 4 subscribers, lossy: 16-byte messages received per second</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 32.3M · 0% lost (copying calls, polling receive, 512 KiB ring, 0.2% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6861)"></span><b>32.3M · 0% lost</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 30.7M · 1% lost (copying calls, waiting receive, 4 MiB ring, 0.6% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.6527)"></span><b>30.7M · 1% lost</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 47.0M · 26% lost (copying calls, waiting receive, 32 MiB ring, 25.9% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>47.0M · 26% lost</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 38.9M · 27% lost (copying calls, waiting receive, 32 MiB ring, 26.5% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8278)"></span><b>38.9M · 27% lost</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 3.06M · 46% lost (ipc://, waiting receive, 32 MiB buffer, 46.0% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0650)"></span><b>3.06M · 46% lost</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 3.21M · 70% lost (ipc://, waiting receive, 4 MiB buffer, 69.9% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0683)"></span><b>3.21M · 70% lost</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 3.43M · 38% lost (ipc://, polling receive, 32 MiB buffer, 38.1% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0729)"></span><b>3.43M · 38% lost</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 3.68M (TCP, waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0782)"></span><b>3.68M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 1.37M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0292)"></span><b>1.37M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 1.27M (polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0271)"></span><b>1.27M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 962.3K (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0205)"></span><b>962.3K</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 1.40M (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0298)"></span><b>1.40M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 7.69K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0002)"></span><b>7.69K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 21.2K · 83% lost (ipc://, waiting receive, 64 KiB buffer, 82.9% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0004)"></span><b>21.2K · 83% lost</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 36.5K · 47% lost (ipc://, polling receive, 64 KiB buffer, 46.6% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0008)"></span><b>36.5K · 47% lost</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 98.6K · 67% lost (ipc://, polling receive, 64 KiB buffer, 67.1% lost)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0021)"></span><b>98.6K · 67% lost</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-broadcast-lossy -->
+    </div>
+  </section>
+
+  <section class="plate" id="queue" aria-labelledby="h-queue">
+    <div class="plate-head"><h2 id="h-queue">Work queue: producers and consumers</h2><span class="eyebrow">queue-PxC-N</span></div>
+    <p class="intro">Producer and consumer processes, each message to exactly one consumer: 1 producer and 1 consumer, and 4 of each. The rate is every consumer's messages together.</p>
+    <!-- prose:queue -->
+    <div class="compare-charts">
+<!-- generated:chart-queue -->
+<div class="chart" role="figure" aria-label="Work queue, 4 producers × 4 consumers: 16-byte messages per second">
+  <div class="chart-title"><h3>Work queue, 4 producers × 4 consumers: 16-byte messages per second</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 68.0M (zero-copy calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8149)"></span><b>68.0M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 65.8M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7887)"></span><b>65.8M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 83.5M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>83.5M</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 36.0M (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.4310)"></span><b>36.0M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 32.3M (ipc://, polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3874)"></span><b>32.3M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 14.6M (ipc://, polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1751)"></span><b>14.6M</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Boost.Interprocess</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Boost.Interprocess · Linux x86-64 · 4.72M (waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0565)"></span><b>4.72M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Boost.Interprocess · Windows · 1.11M (waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0133)"></span><b>1.11M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Boost.Interprocess · macOS · 7.12M (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0853)"></span><b>7.12M</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 46.8K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0006)"></span><b>46.8K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 134.2K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0016)"></span><b>134.2K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 105.2K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0013)"></span><b>105.2K</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-queue -->
+<!-- generated:chart-queue-1x1 -->
+<div class="chart" role="figure" aria-label="Work queue, 1 producer × 1 consumer: 16-byte messages per second">
+  <div class="chart-title"><h3>Work queue, 1 producer × 1 consumer: 16-byte messages per second</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 31.0M (zero-copy calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8926)"></span><b>31.0M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 29.8M (zero-copy calls, polling receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.8571)"></span><b>29.8M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 32.6M (copying calls, polling receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9373)"></span><b>32.6M</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 34.8M (copying calls, waiting receive, 4 MiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>34.8M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 7.74M (ipc://, polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2227)"></span><b>7.74M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 7.68M (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2208)"></span><b>7.68M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 7.17M (TCP, polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2063)"></span><b>7.17M</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 9.43M (TCP, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2711)"></span><b>9.43M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">Boost.Interprocess</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="Boost.Interprocess · Linux x86-64 · 4.82M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1386)"></span><b>4.82M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="Boost.Interprocess · Windows · 3.90M (polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1122)"></span><b>3.90M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="Boost.Interprocess · macOS · 10.3M (polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2948)"></span><b>10.3M</b></div>
+      <div class="bar la" tabindex="0" data-tip="Boost.Interprocess · Linux ARM64 · 5.89M (waiting receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.1694)"></span><b>5.89M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 20.3K (ipc://, polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0006)"></span><b>20.3K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 51.7K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0015)"></span><b>51.7K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 79.8K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0023)"></span><b>79.8K</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 35.6K (TCP, polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0010)"></span><b>35.6K</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-queue-1x1 -->
+    </div>
+  </section>
+
+  <section class="plate" id="service" aria-labelledby="h-svc">
+    <div class="plate-head"><h2 id="h-svc">Service: requests and replies</h2><span class="eyebrow">service-CxS-N</span></div>
+    <p class="intro">Client and server processes; each client sends a request, waits for its reply, and sends the next. 1 client and 1 server, 4 clients and 1 server, and 4 of each, where the servers share the requests. The rate is every client's calls together; a call's p50 is its round trip.</p>
+    <!-- prose:service -->
+    <div class="compare-charts">
+<!-- generated:chart-service -->
+<div class="chart" role="figure" aria-label="Service, 1 client × 1 server: 16-byte calls per second">
+  <div class="chart-title"><h3>Service, 1 client × 1 server: 16-byte calls per second</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 3.36M (copying calls, waiting receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7852)"></span><b>3.36M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 3.01M (copying calls, waiting receive, 64 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.7052)"></span><b>3.01M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 4.27M (copying calls, waiting receive, 64 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>4.27M</b></div>
+      <div class="bar la" tabindex="0" data-tip="FastIPC · Linux ARM64 · 3.85M (copying calls, waiting receive, 64 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9009)"></span><b>3.85M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">iceoryx2</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="iceoryx2 · Linux x86-64 · 933.1K (polling receive, 16 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2183)"></span><b>933.1K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="iceoryx2 · Windows · 912.5K (polling receive, 16 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2135)"></span><b>912.5K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="iceoryx2 · macOS · 1.34M (polling receive, 16 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.3142)"></span><b>1.34M</b></div>
+      <div class="bar la" tabindex="0" data-tip="iceoryx2 · Linux ARM64 · 1.24M (polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.2908)"></span><b>1.24M</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 12.3K (ipc://, polling receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0029)"></span><b>12.3K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 18.2K (ipc://, polling receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0042)"></span><b>18.2K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 23.0K (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0054)"></span><b>23.0K</b></div>
+      <div class="bar la" tabindex="0" data-tip="ZeroMQ · Linux ARM64 · 24.9K (TCP, polling receive, 32 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0058)"></span><b>24.9K</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 8.32K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0019)"></span><b>8.32K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 19.6K (TCP, polling receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0046)"></span><b>19.6K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 40.4K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0094)"></span><b>40.4K</b></div>
+      <div class="bar la" tabindex="0" data-tip="NNG · Linux ARM64 · 7.20K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0017)"></span><b>7.20K</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-service -->
+<!-- generated:chart-service-4x4 -->
+<div class="chart" role="figure" aria-label="Service, 4 clients × 4 servers: 16-byte calls per second">
+  <div class="chart-title"><h3>Service, 4 clients × 4 servers: 16-byte calls per second</h3><div class="legend" aria-hidden="true"><span class="mach"><span><i style="background:var(--s-linux)"></i>Linux x86-64</span><span><i style="background:var(--s-win)"></i>Windows</span><span><i style="background:var(--s-mac)"></i>macOS</span><span><i style="background:var(--s-arm)"></i>Linux ARM64</span></span></div></div>
+  <div class="bars">
+    <div class="grp"><div class="lbl self">FastIPC</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="FastIPC · Linux x86-64 · 5.00M (copying calls, waiting receive, 512 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9184)"></span><b>5.00M</b></div>
+      <div class="bar wn" tabindex="0" data-tip="FastIPC · Windows · 5.33M (zero-copy calls, waiting receive, 64 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 0.9777)"></span><b>5.33M</b></div>
+      <div class="bar mc" tabindex="0" data-tip="FastIPC · macOS · 5.45M (copying calls, waiting receive, 64 KiB ring)"><span class="fill" style="width:calc((100% - 6.5em) * 1.0000)"></span><b>5.45M</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">ZeroMQ</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="ZeroMQ · Linux x86-64 · 30.8K (ipc://, waiting receive, 4 MiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0056)"></span><b>30.8K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="ZeroMQ · Windows · 50.4K (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0093)"></span><b>50.4K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="ZeroMQ · macOS · 53.7K (ipc://, waiting receive, 512 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0099)"></span><b>53.7K</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+    <div class="grp"><div class="lbl">NNG</div><div class="track">
+      <div class="bar lx" tabindex="0" data-tip="NNG · Linux x86-64 · 17.0K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0031)"></span><b>17.0K</b></div>
+      <div class="bar wn" tabindex="0" data-tip="NNG · Windows · 42.6K (TCP, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0078)"></span><b>42.6K</b></div>
+      <div class="bar mc" tabindex="0" data-tip="NNG · macOS · 42.6K (ipc://, waiting receive, 64 KiB buffer)"><span class="fill" style="width:calc((100% - 6.5em) * 0.0078)"></span><b>42.6K</b></div>
+      <div class="bar la none"><b>—</b></div>
+    </div></div>
+  </div>
+</div>
+<!-- /generated:chart-service-4x4 -->
+    </div>
+  </section>
+
+  <section class="plate" id="cases" aria-labelledby="h-cases">
+    <div class="plate-head"><h2 id="h-cases">Case by case</h2><span class="eyebrow">FastIPC against the fastest of the others</span></div>
+<!-- generated:scoreboard -->
+<div class="table-wrap"><table class="data compare scoreboard">
+<thead><tr><th scope="col">Case</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead><tbody>
+<tr><td>Round trip, 16 B, p50</td><td class="n"><b>163 ns</b> <small>1.18×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;192 ns</small></td><td class="n"><b>160 ns</b> <small>1.19×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;191 ns</small></td><td class="n"><b>125 ns</b> <small>1.00×&nbsp;<span class="tie">as fast</span> as Aeron's&nbsp;125 ns</small></td><td class="n"><b>125 ns</b> <small>1.00×&nbsp;<span class="tie">as fast</span> as Aeron's&nbsp;125 ns</small></td></tr>
+<tr><td>Stream, 16 B, one way</td><td class="n"><b>50.3M</b> <small>1.12×&nbsp;<span class="slower">slower</span> than Aeron's&nbsp;56.5M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></small></td><td class="n"><b>52.5M</b> <small>1.11×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;47.3M</small></td><td class="n"><b>82.1M</b> <small>1.42×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;57.6M</small></td><td class="n"><b>72.4M</b> <small>1.43×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;50.6M</small></td></tr>
+<tr><td>Stream, 1 KiB, one way</td><td class="n"><b>28.8M</b> <small>1.54×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;18.8M</small></td><td class="n"><b>30.0M</b> <small>1.32×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;22.7M</small></td><td class="n"><b>29.5M</b> <small>1.14×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;25.8M</small></td><td class="n"><b>25.9M</b> <small>1.11×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;23.2M</small></td></tr>
+<tr><td>Stream, 64 KiB, one way</td><td class="n"><b>489.3K</b> <small>1.19×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;411.0K</small></td><td class="n"><b>492.7K</b> <small>1.20×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;408.9K</small></td><td class="n"><b>642.4K</b> <small>1.57×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;408.4K</small></td><td class="n"><b>661.0K</b> <small>1.47×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;449.1K</small></td></tr>
+<tr><td>Broadcast to 4, lossless, 16 B</td><td class="n"><b>44.4M</b> <small>1.03×&nbsp;<span class="slower close">slower</span> than Aeron's&nbsp;45.6M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></small></td><td class="n"><b>38.3M</b> <small>1.18×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;32.5M</small></td><td class="n"><b>50.7M</b> <small>1.21×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;41.9M</small></td><td class="n"><b>40.8M</b> <small>1.71×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;23.8M</small></td></tr>
+<tr><td>Work queue 4 × 4, 16 B</td><td class="n"><b>68.0M</b> <small>1.89×&nbsp;<span class="faster">faster</span> than ZeroMQ's&nbsp;36.0M</small></td><td class="n"><b>65.8M</b> <small>2.04×&nbsp;<span class="faster">faster</span> than ZeroMQ's&nbsp;32.3M</small></td><td class="n"><b>83.5M</b> <small>5.71×&nbsp;<span class="faster">faster</span> than ZeroMQ's&nbsp;14.6M</small></td><td class="n muted">—</td></tr>
+<tr><td>Service 1 × 1, 16 B, calls</td><td class="n"><b>3.36M</b> <small>3.60×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;933.1K</small></td><td class="n"><b>3.01M</b> <small>3.30×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;912.5K</small></td><td class="n"><b>4.27M</b> <small>3.18×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;1.34M</small></td><td class="n"><b>3.85M</b> <small>3.10×&nbsp;<span class="faster">faster</span> than iceoryx2's&nbsp;1.24M</small></td></tr>
+<tr><td>Service 4 × 4, 16 B, calls</td><td class="n"><b>5.00M</b> <small>163×&nbsp;<span class="faster">faster</span> than ZeroMQ's&nbsp;30.8K</small></td><td class="n"><b>5.33M</b> <small>106×&nbsp;<span class="faster">faster</span> than ZeroMQ's&nbsp;50.4K</small></td><td class="n"><b>5.45M</b> <small>101×&nbsp;<span class="faster">faster</span> than ZeroMQ's&nbsp;53.7K</small></td><td class="n muted">—</td></tr>
+</tbody></table></div>
+<h3 style="margin-top:24px" id="aeron-note">Aeron in detail</h3>
+<div class="paragraphs">
+<p class="note"><b>*</b> Aeron leads FastIPC on Linux x86-64 in the 16-byte stream and the lossless 16-byte broadcast to 4 subscribers; on Linux ARM64 in the lossless 1 KiB broadcast to 1 subscriber.</p>
+<p class="note">Both libraries can let a receiver sleep once it has spun briefly on an empty buffer; they differ in what ends the sleep. FastIPC's sender wakes a sleeping receiver as it sends (a futex on Linux, its counterparts on Windows and macOS), so the message is taken as soon as the wake-up lands. Aeron's receive never blocks: between empty polls, the application's idle strategy spins, yields or sleeps for a set time, and nothing cuts a sleep short, so a message that arrives during one waits for it to end. An Aeron receiver that sleeps frees its core at the cost of that delay; one that never sleeps keeps a core 100% busy even while no messages arrive. Every benchmark here polls Aeron without a pause, its lowest-latency setting. Each FastIPC figure is the better of its waiting receive and a polling one, which keeps a core busy like Aeron's.</p>
+<p class="note">Aeron also needs its media driver running, as a process of its own (as here) or embedded in one of the applications. The driver's conductor, which moves a publisher's flow-control limit, spins on Windows and backs off into sleeps when idle on Linux x86-64, macOS and Linux ARM64, the fastest setting measured on each. Where it spins, it keeps a second core busy. The receiver polls the same way under either setting.</p>
+</div>
+<!-- /generated:scoreboard -->
+  </section>
+
+  <section class="plate" id="batched" aria-labelledby="h-batched">
+    <div class="plate-head"><h2 id="h-batched">Batched: FastIPC and Aeron, both ends batching</h2><span class="eyebrow">run.py --batch 16</span></div>
+    <p class="intro">Everything above sends and receives one message per call, with every library. FastIPC and Aeron also have calls that move several messages at once, so here the two of them run with both ends batching, in the same run, each in its configuration from above. FastIPC's sender calls <code>fipc_send_many</code> with 16 messages, and its receiver <code>fipc_recv_many</code> with room for 16: it waits for the first message, then takes every further one already there, up to 16. Aeron's sender offers 16 messages as one block (<code>aeron_exclusive_publication_offer_block</code>), and its receiver polls with a fragment limit of 16. FastIPC counts the faster of a waiting and a polling receive, as above; Aeron always polls. A round trip has one message at a time to send, so it isn't here. Each cell is FastIPC's figure and how it compares with Aeron's; the last rows batch 64 messages at both ends, and hovering a cell shows both configurations. Batch both ends: a batching sender whose receiver takes one message per call runs slower than one that sends one message per call, as the receiver falls behind and the ring stays full.</p>
+<!-- generated:batched -->
+<div class="table-wrap"><table class="data compare scoreboard">
+<thead><tr><th scope="col">Case</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead><tbody>
+<tr><td>Stream, 16 B</td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 512 KiB window"><b>102.2M</b> <small>1.19×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;86.1M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 512 KiB window"><b>111.5M</b> <small>1.07×&nbsp;<span class="slower">slower</span> than Aeron's&nbsp;119.4M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 4 MiB window"><b>117.6M</b> <small>1.02×&nbsp;<span class="slower close">slower</span> than Aeron's&nbsp;119.4M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 4 MiB window"><b>128.0M</b> <small>1.14×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;112.1M</small></td></tr>
+<tr><td>Stream, 1 KiB</td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 512 KiB window"><b>30.7M</b> <small>1.49×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;20.6M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 512 KiB window"><b>34.5M</b> <small>1.29×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;26.8M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 4 MiB window"><b>35.3M</b> <small>2.68×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;13.1M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 4 MiB window"><b>34.9M</b> <small>2.28×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;15.3M</small></td></tr>
+<tr><td>Broadcast to 1, lossless, 16 B</td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 4 MiB window"><b>101.2M</b> <small>1.11×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;91.3M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 512 KiB window"><b>106.1M</b> <small>1.02×&nbsp;<span class="slower close">slower</span> than Aeron's&nbsp;107.9M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 32 MiB window"><b>108.3M</b> <small>1.00×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;108.2M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 32 MiB window"><b>114.0M</b> <small>1.19×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;95.7M</small></td></tr>
+<tr><td>Broadcast to 4, lossless, 16 B</td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, polling receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 4 MiB window"><b>83.6M</b> <small>1.04×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;80.6M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 512 KiB window"><b>86.4M</b> <small>1.09×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;79.5M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 32 MiB window"><b>72.8M</b> <small>1.04×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;70.3M</small></td><td class="n" title="FastIPC: fipc_send_many of 16, fipc_recv_many of up to 16, waiting receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 16, polls of up to 16 fragments, polling receive, 32 MiB window"><b>58.7M</b> <small>1.35×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;43.6M</small></td></tr>
+<tr class="sep"><td>Stream, 16 B, batches of 64</td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 512 KiB window"><b>121.8M</b> <small>1.28×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;94.9M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 512 KiB window"><b>124.4M</b> <small>1.02×&nbsp;<span class="slower close">slower</span> than Aeron's&nbsp;126.6M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 4 MiB window"><b>123.5M</b> <small>1.03×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;120.3M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 4 MiB window"><b>132.3M</b> <small>1.13×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;117.1M</small></td></tr>
+<tr><td>Stream, 1 KiB, batches of 64</td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 512 KiB window"><b>27.1M</b> <small>1.71×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;15.9M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 512 KiB window"><b>28.0M</b> <small>1.54×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;18.2M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 4 MiB window"><b>35.4M</b> <small>1.42×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;25.0M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 4 MiB window"><b>32.3M</b> <small>1.81×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;17.9M</small></td></tr>
+<tr><td>Broadcast to 1, lossless, 16 B, batches of 64</td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 4 MiB window"><b>109.3M</b> <small>1.10×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;99.6M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 512 KiB window"><b>111.3M</b> <small>1.07×&nbsp;<span class="slower">slower</span> than Aeron's&nbsp;119.6M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 32 MiB window"><b>117.8M</b> <small>1.01×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;117.2M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 32 MiB window"><b>108.9M</b> <small>1.08×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;101.1M</small></td></tr>
+<tr><td>Broadcast to 4, lossless, 16 B, batches of 64</td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 512 KiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 4 MiB window"><b>88.4M</b> <small>1.02×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;86.9M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, polling receive, 4 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 512 KiB window"><b>92.5M</b> <small>1.04×&nbsp;<span class="slower close">slower</span> than Aeron's&nbsp;96.6M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 32 MiB window"><b>77.2M</b> <small>1.05×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;73.4M</small></td><td class="n" title="FastIPC: fipc_send_many of 64, fipc_recv_many of up to 64, waiting receive, 32 MiB ring; Aeron: aeron_exclusive_publication_offer_block of 64, polls of up to 64 fragments, polling receive, 32 MiB window"><b>60.4M</b> <small>1.47×&nbsp;<span class="faster">faster</span> than Aeron's&nbsp;41.2M</small></td></tr>
+</tbody></table></div>
+<p class="note">Who is faster with batches of 16 at both ends: in the 16-byte stream FastIPC on Linux x86-64 (by 19%) and Linux ARM64 (by 14%), Aeron on Windows (by 7%) and macOS (by 2%); in the 1 KiB stream FastIPC on Linux x86-64 (by 49%), Windows (by 29%), macOS (by 168%) and Linux ARM64 (by 128%); in the lossless 16-byte broadcast to 1 subscriber FastIPC on Linux x86-64 (by 11%) and Linux ARM64 (by 19%), Aeron on Windows (by 2%), the two level on macOS; in the lossless 16-byte broadcast to 4 subscribers FastIPC on Linux x86-64 (by 4%), Windows (by 9%), macOS (by 4%) and Linux ARM64 (by 35%).</p>
+<!-- /generated:batched -->
+  </section>
+
+  <section class="plate" id="libraries" aria-labelledby="h-libs">
+    <div class="plate-head"><h2 id="h-libs">The libraries</h2><span class="eyebrow">what each one has</span></div>
+    <p class="intro">Which of the four patterns each library has, and how its messages travel. A pattern a library lacks shows as a dash in the results: the harness doesn't build one out of something else (a work queue from a broadcast, say), because the library's users couldn't either.</p>
+    <div class="table-wrap">
+      <table class="data matrix-lib">
+        <thead><tr><th scope="col">Library</th><th scope="col">Version</th><th scope="col">Messages travel through</th><th scope="col">Stream</th><th scope="col">Broadcast</th><th scope="col">Work queue</th><th scope="col">Service</th></tr></thead>
+        <tbody>
+          <tr><td><b>FastIPC</b></td><td>1.0.0</td><td>shared memory rings, no broker or daemon</td><td class="y">yes</td><td class="y">lossless or lossy</td><td class="y">yes</td><td class="y">a pool of servers sharing the load</td></tr>
+          <tr><td>iceoryx2</td><td>0.10.0</td><td>shared memory, zero-copy samples, no broker</td><td class="y">publish-subscribe</td><td class="y">lossless or lossy</td><td class="no">no (every subscriber gets every sample)</td><td class="y">request-response, one server (a request goes to every server)</td></tr>
+          <tr><td>Aeron</td><td>1.53.3</td><td>shared memory log buffers (<code>aeron:ipc</code>), a media driver process</td><td class="y">yes</td><td class="y">lossless</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>ZeroMQ</td><td>4.3.5</td><td>a local socket (<code>ipc://</code>) or TCP, I/O threads</td><td class="y">PAIR</td><td class="y">lossy (PUB/SUB)</td><td class="y">PUSH/PULL</td><td class="y">REQ/REP, servers in turn</td></tr>
+          <tr><td>NNG</td><td>2.0.0</td><td>a local socket (<code>ipc://</code>; Windows: a named pipe) or TCP</td><td class="y">pair</td><td class="y">lossy (pub/sub)</td><td class="y">push/pull</td><td class="y">req/rep, servers in turn</td></tr>
+          <tr><td>cpp-ipc</td><td>1.4.1</td><td>shared memory (Linux, Windows, FreeBSD)</td><td class="y">route</td><td class="y">lossless</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Boost.Interprocess</td><td>1.92.0</td><td>a shared memory queue under a mutex</td><td class="y">message_queue</td><td class="no">no</td><td class="y">message_queue</td><td class="no">no</td></tr>
+          <tr><td>Unix socket, TCP</td><td>the OS's</td><td>the kernel</td><td class="y">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">iceoryx2 also has events and a blackboard, Aeron an archive and a cluster, and ZeroMQ and NNG more socket patterns; this page compares the four patterns FastIPC has. Language bindings: FastIPC has C, C++, Zig, Python, C#, Java, Rust, Lua, JavaScript and Go; this comparison calls every library from C++, and iceoryx2 from Rust, its own language.</p>
+  </section>
+
+  <section class="plate" id="tables" aria-labelledby="h-tables">
+    <div class="plate-head"><h2 id="h-tables">Every case</h2><span class="eyebrow">each library's best figure</span></div>
+    <h3>Streams and round trips</h3>
+<!-- generated:table-stream -->
+<div class="table-wrap"><table class="data compare">
+<thead><tr><th scope="col">Case</th><th scope="col">Library</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead><tbody>
+<tr class="sep"><td class="case">Stream, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, polling receive, 4 MiB ring">50.3M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">52.5M</td><td class="n" title="copying calls, waiting receive, 512 KiB ring">82.1M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">72.4M</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 512 KiB window">56.5M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></td><td class="n" title="polling receive, 512 KiB window">47.3M</td><td class="n" title="polling receive, 4 MiB window">57.6M</td><td class="n" title="polling receive, 4 MiB window">50.6M</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 64 KiB buffer">7.84M</td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">8.44M</td><td class="n" title="TCP, polling receive, 4 MiB buffer">7.38M</td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">9.73M</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="polling receive, 32 MiB buffer">7.22M</td><td class="n" title="polling receive, 4 MiB buffer">3.57M</td><td class="n" title="polling receive, 32 MiB buffer">10.2M</td><td class="n" title="waiting receive, 32 MiB buffer">5.82M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">3.63M</td><td class="n" title="polling receive, 4 MiB buffer">3.23M</td><td class="n" title="polling receive, 512 KiB buffer">6.27M</td><td class="n" title="polling receive, 4 MiB buffer">5.59M</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="waiting receive">2.34M</td><td class="n" title="polling receive">1.01M</td><td class="n muted">—</td><td class="n" title="polling receive">2.59M</td></tr>
+<tr><td class="case"></td><td>Unix socket</td><td class="n" title="waiting receive">2.17M</td><td class="n" title="waiting receive">986.9K</td><td class="n" title="polling receive">2.00M</td><td class="n" title="polling receive">2.33M</td></tr>
+<tr><td class="case"></td><td>TCP loopback</td><td class="n" title="polling receive">558.8K</td><td class="n" title="polling receive">115.2K</td><td class="n" title="waiting receive">548.6K</td><td class="n" title="polling receive">572.3K</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">19.4K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">52.5K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">92.8K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">135.4K</td></tr>
+<tr class="sep"><td class="case">Stream, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">28.8M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">30.0M</td><td class="n" title="copying calls, waiting receive, 512 KiB ring">29.5M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">25.9M</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 512 KiB window">18.8M</td><td class="n" title="polling receive, 512 KiB window">22.7M</td><td class="n" title="polling receive, 4 MiB window">25.8M</td><td class="n" title="polling receive, 4 MiB window">23.2M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">3.17M</td><td class="n" title="polling receive, 4 MiB buffer">3.05M</td><td class="n" title="polling receive, 512 KiB buffer">4.82M</td><td class="n" title="polling receive, 4 MiB buffer">4.82M</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="waiting receive, 32 MiB buffer">1.85M</td><td class="n" title="polling receive, 4 MiB buffer">2.90M</td><td class="n" title="polling receive, 32 MiB buffer">7.21M</td><td class="n" title="waiting receive, 32 MiB buffer">3.02M</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="TCP, polling receive, 4 MiB buffer">1.68M</td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">1.28M</td><td class="n" title="TCP, waiting receive, 4 MiB buffer">2.40M</td><td class="n" title="TCP, polling receive, 4 MiB buffer">2.06M</td></tr>
+<tr><td class="case"></td><td>Unix socket</td><td class="n" title="polling receive">1.85M</td><td class="n" title="waiting receive">939.9K</td><td class="n" title="waiting receive">1.83M</td><td class="n" title="polling receive">1.33M</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="polling receive">691.2K</td><td class="n" title="waiting receive">198.3K</td><td class="n muted">—</td><td class="n" title="polling receive">472.4K</td></tr>
+<tr><td class="case"></td><td>TCP loopback</td><td class="n" title="polling receive">527.5K</td><td class="n" title="polling receive">113.5K</td><td class="n" title="waiting receive">532.9K</td><td class="n" title="polling receive">512.8K</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">18.3K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">49.9K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">87.6K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">124.2K</td></tr>
+<tr class="sep"><td class="case">Stream, 64 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">489.3K</td><td class="n" title="copying calls, polling receive, 4 MiB ring">492.7K</td><td class="n" title="copying calls, waiting receive, 512 KiB ring">642.4K</td><td class="n" title="zero-copy calls, polling receive, 4 MiB ring">661.0K</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">411.0K</td><td class="n" title="polling receive, 4 MiB buffer">408.9K</td><td class="n" title="polling receive, 512 KiB buffer">408.4K</td><td class="n" title="polling receive, 4 MiB buffer">449.1K</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 512 KiB window">190.8K</td><td class="n" title="polling receive, 512 KiB window">216.7K</td><td class="n" title="polling receive, 4 MiB window">249.6K</td><td class="n" title="polling receive, 4 MiB window">230.7K</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="waiting receive">322.9K</td><td class="n" title="polling receive">221.3K</td><td class="n muted">—</td><td class="n" title="polling receive">79.1K</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="waiting receive, 32 MiB buffer">54.4K</td><td class="n" title="polling receive, 4 MiB buffer">262.8K</td><td class="n" title="polling receive, 32 MiB buffer">298.8K</td><td class="n" title="polling receive, 32 MiB buffer">167.8K</td></tr>
+<tr><td class="case"></td><td>Unix socket</td><td class="n" title="polling receive">167.1K</td><td class="n" title="polling receive">196.5K</td><td class="n" title="polling receive">100.4K</td><td class="n" title="polling receive">156.3K</td></tr>
+<tr><td class="case"></td><td>TCP loopback</td><td class="n" title="polling receive">118.2K</td><td class="n" title="polling receive">52.1K</td><td class="n" title="waiting receive">130.6K</td><td class="n" title="polling receive">129.8K</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="TCP, polling receive, 4 MiB buffer">81.8K</td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">55.3K</td><td class="n" title="TCP, polling receive, 4 MiB buffer">102.2K</td><td class="n" title="TCP, polling receive, 4 MiB buffer">106.4K</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">16.6K</td><td class="n" title="TCP, waiting receive, 512 KiB buffer">26.3K</td><td class="n" title="TCP, waiting receive, 512 KiB buffer">45.9K</td><td class="n" title="TCP, waiting receive, 512 KiB buffer">35.9K</td></tr>
+<tr class="sep"><td class="case">Round trip, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">163 ns <small>p99 250 ns</small></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">160 ns <small>p99 226 ns</small></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">125 ns <small>p99 125 ns</small></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">125 ns <small>p99 167 ns</small></td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 512 KiB window">192 ns <small>p99 311 ns</small></td><td class="n" title="polling receive, 512 KiB window">191 ns <small>p99 269 ns</small></td><td class="n" title="polling receive, 4 MiB window">125 ns <small>p99 208 ns</small></td><td class="n" title="polling receive, 4 MiB window">125 ns <small>p99 208 ns</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">854 ns <small>p99 1.1 µs</small></td><td class="n" title="polling receive, 4 MiB buffer">897 ns <small>p99 1.1 µs</small></td><td class="n" title="polling receive, 512 KiB buffer">583 ns <small>p99 667 ns</small></td><td class="n" title="polling receive, 4 MiB buffer">625 ns <small>p99 750 ns</small></td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="polling receive, 32 MiB buffer">1.6 µs <small>p99 17 µs</small></td><td class="n" title="polling receive, 4 MiB buffer">680 ns <small>p99 1.5 µs</small></td><td class="n" title="waiting receive, 32 MiB buffer">375 ns <small>p99 1.4 µs</small></td><td class="n" title="polling receive, 32 MiB buffer">1.5 µs <small>p99 7.2 µs</small></td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="polling receive">1.2 µs <small>p99 1.4 µs</small></td><td class="n" title="waiting receive">2.3 µs <small>p99 16 µs</small></td><td class="n muted">—</td><td class="n" title="polling receive">1.0 µs <small>p99 1.3 µs</small></td></tr>
+<tr><td class="case"></td><td>Unix socket</td><td class="n" title="polling receive">1.7 µs <small>p99 2.1 µs</small></td><td class="n" title="polling receive">3.2 µs <small>p99 4.8 µs</small></td><td class="n" title="polling receive">1.5 µs <small>p99 1.9 µs</small></td><td class="n" title="polling receive">1.6 µs <small>p99 2.0 µs</small></td></tr>
+<tr><td class="case"></td><td>TCP loopback</td><td class="n" title="polling receive">3.7 µs <small>p99 6.3 µs</small></td><td class="n" title="polling receive">14 µs <small>p99 19 µs</small></td><td class="n" title="polling receive">9.0 µs <small>p99 34 µs</small></td><td class="n" title="polling receive">2.9 µs <small>p99 3.5 µs</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 64 KiB buffer">78 µs <small>p99 129 µs</small></td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">53 µs <small>p99 81 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">43 µs <small>p99 79 µs</small></td><td class="n" title="ipc://, polling receive, 512 KiB buffer">30 µs <small>p99 92 µs</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">118 µs <small>p99 174 µs</small></td><td class="n" title="TCP, waiting receive, 64 KiB buffer">47 µs <small>p99 79 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">24 µs <small>p99 34 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">135 µs <small>p99 177 µs</small></td></tr>
+<tr class="sep"><td class="case">Round trip, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">406 ns <small>p99 628 ns</small></td><td class="n" title="zero-copy calls, waiting receive, 4 MiB ring">383 ns <small>p99 591 ns</small></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">292 ns <small>p99 375 ns</small></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">250 ns <small>p99 333 ns</small></td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 512 KiB window">616 ns <small>p99 924 ns</small></td><td class="n" title="polling receive, 512 KiB window">634 ns <small>p99 869 ns</small></td><td class="n" title="polling receive, 4 MiB window">375 ns <small>p99 625 ns</small></td><td class="n" title="polling receive, 4 MiB window">375 ns <small>p99 667 ns</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">1.1 µs <small>p99 1.3 µs</small></td><td class="n" title="polling receive, 4 MiB buffer">1.1 µs <small>p99 1.3 µs</small></td><td class="n" title="polling receive, 512 KiB buffer">667 ns <small>p99 792 ns</small></td><td class="n" title="polling receive, 4 MiB buffer">708 ns <small>p99 792 ns</small></td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="polling receive, 32 MiB buffer">1.8 µs <small>p99 20 µs</small></td><td class="n" title="waiting receive, 4 MiB buffer">815 ns <small>p99 1.0 µs</small></td><td class="n" title="polling receive, 32 MiB buffer">542 ns <small>p99 1.1 µs</small></td><td class="n" title="polling receive, 32 MiB buffer">1.8 µs <small>p99 13 µs</small></td></tr>
+<tr><td class="case"></td><td>Unix socket</td><td class="n" title="polling receive">2.1 µs <small>p99 2.5 µs</small></td><td class="n" title="polling receive">3.8 µs <small>p99 4.9 µs</small></td><td class="n" title="polling receive">1.7 µs <small>p99 2.1 µs</small></td><td class="n" title="polling receive">2.2 µs <small>p99 2.9 µs</small></td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="waiting receive">2.1 µs <small>p99 25 µs</small></td><td class="n" title="waiting receive">3.6 µs <small>p99 22 µs</small></td><td class="n muted">—</td><td class="n" title="polling receive">2.0 µs <small>p99 2.4 µs</small></td></tr>
+<tr><td class="case"></td><td>TCP loopback</td><td class="n" title="polling receive">4.1 µs <small>p99 9.4 µs</small></td><td class="n" title="polling receive">16 µs <small>p99 20 µs</small></td><td class="n" title="polling receive">9.1 µs <small>p99 25 µs</small></td><td class="n" title="polling receive">3.2 µs <small>p99 6.0 µs</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 64 KiB buffer">78 µs <small>p99 130 µs</small></td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">57 µs <small>p99 91 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">44 µs <small>p99 80 µs</small></td><td class="n" title="ipc://, polling receive, 512 KiB buffer">31 µs <small>p99 73 µs</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">115 µs <small>p99 180 µs</small></td><td class="n" title="TCP, waiting receive, 64 KiB buffer">49 µs <small>p99 84 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">25 µs <small>p99 35 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">133 µs <small>p99 170 µs</small></td></tr>
+</tbody></table></div>
+<!-- /generated:table-stream -->
+    <h3 style="margin-top:26px">Broadcasts</h3>
+<!-- generated:table-broadcast -->
+<div class="table-wrap"><table class="data compare">
+<thead><tr><th scope="col">Case</th><th scope="col">Library</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead><tbody>
+<tr class="sep"><td class="case">1 subscriber, lossless, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, polling receive, 512 KiB ring">52.8M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">52.0M</td><td class="n" title="copying calls, polling receive, 32 MiB ring">64.7M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring">69.7M</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 4 MiB window">50.8M</td><td class="n" title="polling receive, 512 KiB window">42.6M</td><td class="n" title="polling receive, 32 MiB window">59.4M</td><td class="n" title="polling receive, 32 MiB window">55.4M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">3.34M</td><td class="n" title="polling receive, 64 KiB buffer">3.17M</td><td class="n" title="polling receive, 4 MiB buffer">6.36M</td><td class="n" title="polling receive, 32 MiB buffer">5.52M</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="polling receive">2.43M</td><td class="n" title="waiting receive">1.05M</td><td class="n muted">—</td><td class="n" title="waiting receive">2.55M</td></tr>
+<tr class="sep"><td class="case">1 subscriber, lossy, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring, 1.4% lost">51.5M <small>1.4% lost</small></td><td class="n" title="copying calls, polling receive, 4 MiB ring">49.0M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring, 13.6% lost">72.2M <small>13.6% lost</small></td><td class="n" title="copying calls, waiting receive, 32 MiB ring, 20.8% lost">68.9M <small>20.8% lost</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 32 MiB buffer, 46.3% lost">7.13M <small>46.3% lost</small></td><td class="n" title="ipc://, polling receive, 4 MiB buffer, 12.7% lost">8.10M <small>12.7% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer, 58.8% lost">7.29M <small>58.8% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer">8.61M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">3.36M</td><td class="n" title="polling receive, 64 KiB buffer">3.15M</td><td class="n" title="polling receive, 4 MiB buffer">6.43M</td><td class="n" title="polling receive, 32 MiB buffer">5.50M</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">17.6K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">52.8K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer, 93.0% lost">84.2K <small>93.0% lost</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer, 67.8% lost">141.0K <small>67.8% lost</small></td></tr>
+<tr class="sep"><td class="case">1 subscriber, lossless, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="zero-copy calls, waiting receive, 4 MiB ring">26.7M</td><td class="n" title="copying calls, polling receive, 4 MiB ring">30.3M</td><td class="n" title="copying calls, polling receive, 32 MiB ring">24.4M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring">21.8M</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 4 MiB window">13.2M</td><td class="n" title="polling receive, 512 KiB window">21.3M</td><td class="n" title="polling receive, 32 MiB window">16.5M</td><td class="n" title="polling receive, 32 MiB window">22.0M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">3.04M</td><td class="n" title="polling receive, 64 KiB buffer">2.87M</td><td class="n" title="polling receive, 4 MiB buffer">4.83M</td><td class="n" title="polling receive, 32 MiB buffer">4.86M</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="polling receive">682.2K</td><td class="n" title="polling receive">212.8K</td><td class="n muted">—</td><td class="n" title="polling receive">478.7K</td></tr>
+<tr class="sep"><td class="case">1 subscriber, lossy, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring, 33.2% lost">20.6M <small>33.2% lost</small></td><td class="n" title="copying calls, waiting receive, 4 MiB ring, 0.3% lost">30.6M <small>0.3% lost</small></td><td class="n" title="copying calls, polling receive, 32 MiB ring">22.9M</td><td class="n" title="copying calls, polling receive, 32 MiB ring">22.3M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">3.09M</td><td class="n" title="polling receive, 64 KiB buffer, 1.2% lost">2.94M <small>1.2% lost</small></td><td class="n" title="polling receive, 4 MiB buffer">4.84M</td><td class="n" title="polling receive, 32 MiB buffer">4.83M</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 32 MiB buffer, 85.7% lost">533.9K <small>85.7% lost</small></td><td class="n" title="ipc://, waiting receive, 4 MiB buffer, 88.9% lost">1.19M <small>88.9% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer, 77.3% lost">1.80M <small>77.3% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer, 70.7% lost">1.26M <small>70.7% lost</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, polling receive, 64 KiB buffer, 97.7% lost">17.5K <small>97.7% lost</small></td><td class="n" title="TCP, waiting receive, 64 KiB buffer, 25.1% lost">50.8K <small>25.1% lost</small></td><td class="n" title="TCP, waiting receive, 64 KiB buffer, 91.2% lost">86.2K <small>91.2% lost</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer, 88.0% lost">82.5K <small>88.0% lost</small></td></tr>
+<tr class="sep"><td class="case">4 subscribers, lossless, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, polling receive, 512 KiB ring">44.4M</td><td class="n" title="copying calls, polling receive, 4 MiB ring">38.3M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring">50.7M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring">40.8M</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 4 MiB window">45.6M<a class="fn" href="#aeron-note" aria-label="note on Aeron's leads">*</a></td><td class="n" title="polling receive, 512 KiB window">32.5M</td><td class="n" title="polling receive, 32 MiB window">41.9M</td><td class="n" title="polling receive, 32 MiB window">23.8M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">1.36M</td><td class="n" title="polling receive, 64 KiB buffer">1.29M</td><td class="n" title="polling receive, 4 MiB buffer">972.2K</td><td class="n" title="polling receive, 32 MiB buffer">1.51M</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="polling receive">13.3K</td><td class="n" title="waiting receive">45.1K</td><td class="n muted">—</td><td class="n" title="polling receive">12.0K</td></tr>
+<tr class="sep"><td class="case">4 subscribers, lossy, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, polling receive, 512 KiB ring, 0.2% lost">32.3M <small>0.2% lost</small></td><td class="n" title="copying calls, waiting receive, 4 MiB ring, 0.6% lost">30.7M <small>0.6% lost</small></td><td class="n" title="copying calls, waiting receive, 32 MiB ring, 25.9% lost">47.0M <small>25.9% lost</small></td><td class="n" title="copying calls, waiting receive, 32 MiB ring, 26.5% lost">38.9M <small>26.5% lost</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 32 MiB buffer, 46.0% lost">3.06M <small>46.0% lost</small></td><td class="n" title="ipc://, waiting receive, 4 MiB buffer, 69.9% lost">3.21M <small>69.9% lost</small></td><td class="n" title="ipc://, polling receive, 32 MiB buffer, 38.1% lost">3.43M <small>38.1% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer">3.68M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">1.37M</td><td class="n" title="polling receive, 64 KiB buffer">1.27M</td><td class="n" title="polling receive, 4 MiB buffer">962.3K</td><td class="n" title="polling receive, 32 MiB buffer">1.40M</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">7.69K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer, 82.9% lost">21.2K <small>82.9% lost</small></td><td class="n" title="ipc://, polling receive, 64 KiB buffer, 46.6% lost">36.5K <small>46.6% lost</small></td><td class="n" title="ipc://, polling receive, 64 KiB buffer, 67.1% lost">98.6K <small>67.1% lost</small></td></tr>
+<tr class="sep"><td class="case">4 subscribers, lossless, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="zero-copy calls, waiting receive, 4 MiB ring">18.6M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">20.7M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring">12.6M</td><td class="n" title="copying calls, waiting receive, 32 MiB ring">11.8M</td></tr>
+<tr><td class="case"></td><td>Aeron</td><td class="n" title="polling receive, 4 MiB window">10.9M</td><td class="n" title="polling receive, 512 KiB window">17.6M</td><td class="n" title="polling receive, 32 MiB window">8.33M</td><td class="n" title="polling receive, 32 MiB window">7.44M</td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">1.33M</td><td class="n" title="polling receive, 64 KiB buffer">1.27M</td><td class="n" title="polling receive, 4 MiB buffer">806.3K</td><td class="n" title="polling receive, 32 MiB buffer">1.48M</td></tr>
+<tr><td class="case"></td><td>cpp-ipc</td><td class="n" title="waiting receive">13.7K</td><td class="n" title="polling receive">8.23K</td><td class="n muted">—</td><td class="n" title="polling receive">2.19K</td></tr>
+<tr class="sep"><td class="case">4 subscribers, lossy, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring, 28.1% lost">17.2M <small>28.1% lost</small></td><td class="n" title="copying calls, polling receive, 4 MiB ring, 5.0% lost">20.2M <small>5.0% lost</small></td><td class="n" title="copying calls, polling receive, 32 MiB ring, 8.4% lost">11.5M <small>8.4% lost</small></td><td class="n" title="copying calls, polling receive, 32 MiB ring, 36.1% lost">8.59M <small>36.1% lost</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 4 MiB buffer">1.36M</td><td class="n" title="polling receive, 64 KiB buffer, 0.3% lost">1.31M <small>0.3% lost</small></td><td class="n" title="polling receive, 4 MiB buffer">819.7K</td><td class="n" title="polling receive, 32 MiB buffer">1.58M</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 32 MiB buffer, 97.7% lost">94.9K <small>97.7% lost</small></td><td class="n" title="ipc://, waiting receive, 4 MiB buffer, 96.9% lost">303.0K <small>96.9% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer, 92.8% lost">364.2K <small>92.8% lost</small></td><td class="n" title="TCP, waiting receive, 32 MiB buffer, 93.4% lost">253.5K <small>93.4% lost</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="TCP, waiting receive, 64 KiB buffer, 3.1% lost">7.34K <small>3.1% lost</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer, 91.7% lost">20.1K <small>91.7% lost</small></td><td class="n" title="ipc://, polling receive, 64 KiB buffer, 45.0% lost">19.4K <small>45.0% lost</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer, 87.4% lost">36.5K <small>87.4% lost</small></td></tr>
+</tbody></table></div>
+<!-- /generated:table-broadcast -->
+    <h3 style="margin-top:26px">Work queues</h3>
+<!-- generated:table-queue -->
+<div class="table-wrap"><table class="data compare">
+<thead><tr><th scope="col">Case</th><th scope="col">Library</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead><tbody>
+<tr class="sep"><td class="case">1 × 1, 16 B</td><td><b>FastIPC</b></td><td class="n" title="zero-copy calls, waiting receive, 4 MiB ring">31.0M</td><td class="n" title="zero-copy calls, polling receive, 4 MiB ring">29.8M</td><td class="n" title="copying calls, polling receive, 4 MiB ring">32.6M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">34.8M</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 512 KiB buffer">7.74M</td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">7.68M</td><td class="n" title="TCP, polling receive, 512 KiB buffer">7.17M</td><td class="n" title="TCP, waiting receive, 512 KiB buffer">9.43M</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="polling receive, 4 MiB buffer">4.82M</td><td class="n" title="polling receive, 4 MiB buffer">3.90M</td><td class="n" title="polling receive, 32 MiB buffer">10.3M</td><td class="n" title="waiting receive, 32 MiB buffer">5.89M</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, polling receive, 64 KiB buffer">20.3K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">51.7K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">79.8K</td><td class="n" title="TCP, polling receive, 64 KiB buffer">35.6K</td></tr>
+<tr class="sep"><td class="case">1 × 1, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, polling receive, 4 MiB ring">21.0M</td><td class="n" title="zero-copy calls, polling receive, 4 MiB ring">20.8M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">23.3M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">20.2M</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="waiting receive, 4 MiB buffer">2.38M</td><td class="n" title="polling receive, 4 MiB buffer">2.56M</td><td class="n" title="polling receive, 32 MiB buffer">7.11M</td><td class="n" title="waiting receive, 32 MiB buffer">3.14M</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="TCP, polling receive, 512 KiB buffer">1.49M</td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">1.23M</td><td class="n" title="TCP, waiting receive, 512 KiB buffer">2.17M</td><td class="n" title="TCP, polling receive, 512 KiB buffer">1.84M</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, polling receive, 64 KiB buffer">19.5K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">51.3K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">78.2K</td><td class="n" title="TCP, polling receive, 64 KiB buffer">35.0K</td></tr>
+<tr class="sep"><td class="case">4 × 4, 16 B</td><td><b>FastIPC</b></td><td class="n" title="zero-copy calls, waiting receive, 4 MiB ring">68.0M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">65.8M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">83.5M</td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">36.0M</td><td class="n" title="ipc://, polling receive, 512 KiB buffer">32.3M</td><td class="n" title="ipc://, polling receive, 32 MiB buffer">14.6M</td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="waiting receive, 4 MiB buffer">4.72M</td><td class="n" title="waiting receive, 4 MiB buffer">1.11M</td><td class="n" title="waiting receive, 32 MiB buffer">7.12M</td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">46.8K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">134.2K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">105.2K</td><td class="n muted">—</td></tr>
+<tr class="sep"><td class="case">4 × 4, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 4 MiB ring">43.8M</td><td class="n" title="zero-copy calls, polling receive, 4 MiB ring">44.5M</td><td class="n" title="copying calls, waiting receive, 4 MiB ring">33.3M</td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="TCP, waiting receive, 512 KiB buffer">3.63M</td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">3.92M</td><td class="n" title="ipc://, waiting receive, 32 MiB buffer">2.59M</td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>Boost.Interprocess</td><td class="n" title="polling receive, 4 MiB buffer">1.66M</td><td class="n" title="polling receive, 4 MiB buffer">886.5K</td><td class="n" title="polling receive, 32 MiB buffer">1.20M</td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">48.5K</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">141.3K</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">83.0K</td><td class="n muted">—</td></tr>
+</tbody></table></div>
+<!-- /generated:table-queue -->
+    <h3 style="margin-top:26px">Services</h3>
+<!-- generated:table-service -->
+<div class="table-wrap"><table class="data compare">
+<thead><tr><th scope="col">Case</th><th scope="col">Library</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr></thead><tbody>
+<tr class="sep"><td class="case">1 client × 1 server, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">3.36M <small>p50 262 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">3.01M <small>p50 318 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">4.27M <small>p50 250 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">3.85M <small>p50 250 ns</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 16 KiB buffer">933.1K <small>p50 1.1 µs</small></td><td class="n" title="polling receive, 16 KiB buffer">912.5K <small>p50 1.1 µs</small></td><td class="n" title="polling receive, 16 KiB buffer">1.34M <small>p50 750 ns</small></td><td class="n" title="polling receive, 64 KiB buffer">1.24M <small>p50 833 ns</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 4 MiB buffer">12.3K <small>p50 79 µs</small></td><td class="n" title="ipc://, polling receive, 512 KiB buffer">18.2K <small>p50 54 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">23.0K <small>p50 44 µs</small></td><td class="n" title="TCP, polling receive, 32 MiB buffer">24.9K <small>p50 35 µs</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">8.32K <small>p50 115 µs</small></td><td class="n" title="TCP, polling receive, 64 KiB buffer">19.6K <small>p50 49 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">40.4K <small>p50 24 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">7.20K <small>p50 131 µs</small></td></tr>
+<tr class="sep"><td class="case">1 client × 1 server, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">1.90M <small>p50 448 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">1.87M <small>p50 449 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">2.95M <small>p50 333 ns</small></td><td class="n" title="copying calls, polling receive, 64 KiB ring">2.46M <small>p50 417 ns</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 512 KiB buffer">764.8K <small>p50 1.3 µs</small></td><td class="n" title="polling receive, 512 KiB buffer">744.4K <small>p50 1.3 µs</small></td><td class="n" title="polling receive, 512 KiB buffer">1.16M <small>p50 875 ns</small></td><td class="n" title="polling receive, 64 KiB buffer">1.14M <small>p50 875 ns</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 4 MiB buffer">12.6K <small>p50 76 µs</small></td><td class="n" title="ipc://, polling receive, 512 KiB buffer">17.7K <small>p50 55 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">22.5K <small>p50 45 µs</small></td><td class="n" title="ipc://, polling receive, 512 KiB buffer">27.6K <small>p50 32 µs</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="TCP, waiting receive, 64 KiB buffer">8.28K <small>p50 116 µs</small></td><td class="n" title="TCP, polling receive, 64 KiB buffer">19.1K <small>p50 50 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">39.6K <small>p50 25 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">7.40K <small>p50 133 µs</small></td></tr>
+<tr class="sep"><td class="case">4 clients × 1 server, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">5.27M <small>p50 706 ns</small></td><td class="n" title="zero-copy calls, waiting receive, 64 KiB ring">5.50M <small>p50 681 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">5.51M <small>p50 583 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">7.38M <small>p50 375 ns</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 16 KiB buffer">1.68M <small>p50 1.7 µs</small></td><td class="n" title="polling receive, 16 KiB buffer">1.48M <small>p50 1.9 µs</small></td><td class="n" title="polling receive, 16 KiB buffer">1.80M <small>p50 917 ns</small></td><td class="n" title="polling receive, 64 KiB buffer">1.62M <small>p50 1.3 µs</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, polling receive, 4 MiB buffer">33.1K <small>p50 108 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">53.4K <small>p50 72 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">50.9K <small>p50 77 µs</small></td><td class="n" title="ipc://, polling receive, 512 KiB buffer">34.0K <small>p50 35 µs</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">11.3K <small>p50 334 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">33.2K <small>p50 117 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">33.9K <small>p50 113 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">25.1K <small>p50 146 µs</small></td></tr>
+<tr class="sep"><td class="case">4 clients × 1 server, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">3.36M <small>p50 1.1 µs</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">3.08M <small>p50 1.2 µs</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">4.07M <small>p50 792 ns</small></td><td class="n" title="zero-copy calls, waiting receive, 4 MiB ring">3.62M <small>p50 583 ns</small></td></tr>
+<tr><td class="case"></td><td>iceoryx2</td><td class="n" title="polling receive, 512 KiB buffer">1.25M <small>p50 2.2 µs</small></td><td class="n" title="polling receive, 512 KiB buffer">1.16M <small>p50 1.8 µs</small></td><td class="n" title="polling receive, 512 KiB buffer">1.45M <small>p50 1.2 µs</small></td><td class="n" title="polling receive, 64 KiB buffer">1.40M <small>p50 1.4 µs</small></td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">31.5K <small>p50 124 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">52.4K <small>p50 73 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">49.9K <small>p50 79 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">29.7K <small>p50 125 µs</small></td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">11.3K <small>p50 343 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">33.4K <small>p50 116 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">33.8K <small>p50 111 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">21.6K <small>p50 160 µs</small></td></tr>
+<tr class="sep"><td class="case">4 clients × 4 servers, 16 B</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">5.00M <small>p50 756 ns</small></td><td class="n" title="zero-copy calls, waiting receive, 64 KiB ring">5.33M <small>p50 700 ns</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">5.45M <small>p50 583 ns</small></td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">30.8K <small>p50 123 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">50.4K <small>p50 77 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">53.7K <small>p50 70 µs</small></td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">17.0K <small>p50 224 µs</small></td><td class="n" title="TCP, waiting receive, 64 KiB buffer">42.6K <small>p50 90 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">42.6K <small>p50 89 µs</small></td><td class="n muted">—</td></tr>
+<tr class="sep"><td class="case">4 clients × 4 servers, 1 KiB</td><td><b>FastIPC</b></td><td class="n" title="copying calls, waiting receive, 512 KiB ring">3.68M <small>p50 1.0 µs</small></td><td class="n" title="copying calls, polling receive, 64 KiB ring">3.41M <small>p50 1.2 µs</small></td><td class="n" title="copying calls, waiting receive, 64 KiB ring">4.31M <small>p50 792 ns</small></td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>ZeroMQ</td><td class="n" title="ipc://, waiting receive, 4 MiB buffer">29.9K <small>p50 126 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">48.2K <small>p50 82 µs</small></td><td class="n" title="ipc://, waiting receive, 512 KiB buffer">42.5K <small>p50 80 µs</small></td><td class="n muted">—</td></tr>
+<tr><td class="case"></td><td>NNG</td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">17.7K <small>p50 216 µs</small></td><td class="n" title="TCP, waiting receive, 64 KiB buffer">42.0K <small>p50 89 µs</small></td><td class="n" title="ipc://, waiting receive, 64 KiB buffer">40.4K <small>p50 94 µs</small></td><td class="n muted">—</td></tr>
+</tbody></table></div>
+<!-- /generated:table-service -->
+  </section>
+
+  <section class="plate" id="method" aria-labelledby="h-method">
+    <div class="plate-head"><h2 id="h-method">Method</h2><span class="eyebrow">bench/alternatives/README.md</span></div>
+    <div class="cols">
+      <ul class="plain">
+        <li><b>Processes:</b> every role runs in a process of its own, as IPC does: a stream's sender and receiver, a broadcast's publisher and each subscriber, each producer and consumer, each client and server. No process is pinned to a core.</li>
+        <li><b>The same work:</b> a sender starts with each message in a buffer of its own; a receiver ends with it in memory of its own, and checks its length. A library that copies receives into the receiver's buffer; one that lends out shared memory (iceoryx2, Aeron, cpp-ipc, FastIPC's zero-copy calls) has the message copied out of it.</li>
+        <li><b>Each library at its best:</b> every receiver ran twice, once waiting in the library's receive and once polling it in a loop, and the faster counts (iceoryx2's and Aeron's receives never block, so they always poll). FastIPC counts the faster of its copying and zero-copy calls, ZeroMQ and NNG the faster of their local socket and TCP. Each figure's tooltip names the configuration.</li>
+        <li><b>Configuration:</b> each library runs in its fastest configuration for the pattern on each platform, chosen from sweeps on that platform: its buffer (64&nbsp;KiB, 512&nbsp;KiB, 4&nbsp;MiB and 32&nbsp;MiB per case, alternating), and for Aeron its media driver's conductor (spinning, which keeps one core busy, or backing off into sleeps when idle, Aeron's default). The configuration with the best geometric mean over the pattern's cases wins (a tie: the smaller buffer, then Aeron's default). The buffer is FastIPC's ring, Aeron's window (half its term), and the bytes of messages iceoryx2's subscriber buffers, Boost's queue, NNG's socket buffers and ZeroMQ's high-water marks hold, at least 8 messages (NNG holds at most 8192). cpp-ipc's queue is fixed and the sockets' buffers are the OS's. Every other option is the library's default. Each platform's configuration is listed below.</li>
+        <li><b>One message per receive:</b> every library's receive returns one message, so Aeron's subscription polls take one each (a fragment limit of 1; Aeron can take several per poll, which no other library's receive does). The comparison measures each library's synchronization per message, not batching; <a href="#batched">Batched</a> sets FastIPC and Aeron side by side with both ends batching. A platform whose run took more per poll says so under the configuration table.</li>
+        <li><b>Windows power throttling:</b> the harness turns it off for itself and for every process it starts, so that Windows doesn't move a process to the efficiency cores or lower its clock when the harness runs without focus.</li>
+      </ul>
+      <ul class="plain">
+        <li><b>Timing:</b> each run sends for 0.3&nbsp;s of warm-up and then 1&nbsp;s that counts; the figure is the median of 3 runs. Throughput is timed by the receiver on the CPU's counter, read once per 64 messages; one round trip in 16 is sampled, chosen at random, the clock reads included. The counter ticks at 24&nbsp;MHz on the Apple M1, so its round trips are measured in steps of 42&nbsp;ns.</li>
+        <li><b>iceoryx2</b> runs through its Rust API, its own language. Through its C++ binding it ran up to 5 times slower here (16 B one way on Windows: 0.61M against 3.21M messages per second), so the C++ figures aren't shown.</li>
+        <li><b>Order:</b> every chart and table lists FastIPC first, then the others ranked by their figure's geometric mean over the machines they ran on, the best first, so that the closest rivals sit side by side and no machine's scale outweighs another's.</li>
+        <li><b>The harness's own cost:</b> about 7&nbsp;ns per message on the receiving side (a virtual call and the length and sequence checks), the same for every library. FastIPC's own benchmarks run without it: <a href="#bindings">By language</a>, below.</li>
+        <li>Reproduce with <code>python bench/alternatives/deps.py</code> (fetches and builds every library), a CMake build, and <code>run.py</code>: the <a href="https://github.com/fastipc/fastipc/blob/main/bench/alternatives/README.md">README</a> has the commands, and <code>results/</code> the raw medians of every run.</li>
+      </ul>
+    </div>
+    <h3 style="margin-top:22px">Buffers</h3>
+    <p class="intro">Each library's buffer per pattern; for FastIPC and Aeron, the shared memory it maps in the charted case (a stream, a broadcast to four subscribers, a work queue and a service of 4 × 4). The other libraries' sizes are bytes of messages: at 16&nbsp;B, 64&nbsp;KiB is 4096 messages. Under it, Aeron's conductor and fragment limit on each platform.</p>
+<!-- generated:buffers -->
+<div class="table-wrap"><table class="data">
+<thead><tr><th scope="col">Library</th><th scope="col">Stream</th><th scope="col">Broadcast</th><th scope="col">Work queue</th><th scope="col">Service</th></tr></thead><tbody>
+<tr><td><b>FastIPC</b></td><td>Linux x86-64, Windows, Linux ARM64: 4 MiB <small>maps 8 MiB</small><br>macOS: 512 KiB <small>maps 1 MiB</small></td><td>Linux x86-64: copying calls: 512 KiB <small>maps 768 KiB</small>, zero-copy calls: 4 MiB <small>maps 6 MiB</small><br>Windows: copying calls: 4 MiB <small>maps 6 MiB</small>, zero-copy calls: 512 KiB <small>maps 768 KiB</small><br>macOS, Linux ARM64: 32 MiB <small>maps 48 MiB</small></td><td>Linux x86-64, Windows, macOS: 4 MiB <small>maps 30 MiB</small><br>Linux ARM64: copying calls: 4 MiB <small>maps 30 MiB</small>, zero-copy calls: 32 MiB <small>maps 240 MiB</small></td><td>Linux x86-64: 512 KiB <small>maps 3 MiB</small><br>Windows, macOS: 64 KiB <small>maps 384 KiB</small><br>Linux ARM64: copying calls: 64 KiB <small>maps 384 KiB</small>, zero-copy calls: 4 MiB <small>maps 24 MiB</small></td></tr>
+<tr><td>iceoryx2</td><td>Linux x86-64, Windows, Linux ARM64: 4 MiB<br>macOS: 512 KiB</td><td>Linux x86-64, macOS: 4 MiB<br>Windows: 64 KiB<br>Linux ARM64: 32 MiB</td><td class="muted">—</td><td>Linux x86-64, Windows, macOS: 16 KiB<br>Linux ARM64: 64 KiB</td></tr>
+<tr><td>Aeron</td><td>Linux x86-64, Windows: 512 KiB <small>maps 3 MiB</small><br>macOS, Linux ARM64: 4 MiB <small>maps 24 MiB</small></td><td>Linux x86-64: 4 MiB <small>maps 24 MiB</small><br>Windows: 512 KiB <small>maps 3 MiB</small><br>macOS, Linux ARM64: 32 MiB <small>maps 192 MiB</small></td><td class="muted">—</td><td class="muted">—</td></tr>
+<tr><td>ZeroMQ</td><td>Linux x86-64: ipc://: 64 KiB, TCP: 4 MiB<br>Windows: 4 MiB<br>macOS, Linux ARM64: ipc://: 512 KiB, TCP: 4 MiB</td><td>Linux x86-64, macOS: 32 MiB<br>Windows: ipc://: 4 MiB, TCP: 512 KiB<br>Linux ARM64: ipc://: 512 KiB, TCP: 32 MiB</td><td>Linux x86-64, Windows: 512 KiB<br>macOS, Linux ARM64: ipc://: 32 MiB, TCP: 512 KiB</td><td>Linux x86-64: ipc://: 4 MiB, TCP: 32 MiB<br>Windows, macOS: 512 KiB<br>Linux ARM64: ipc://: 512 KiB, TCP: 32 MiB</td></tr>
+<tr><td>NNG</td><td>64 KiB</td><td>64 KiB</td><td>64 KiB</td><td>64 KiB</td></tr>
+<tr><td>cpp-ipc</td><td>its fixed queue</td><td>its fixed queue</td><td class="muted">—</td><td class="muted">—</td></tr>
+<tr><td>Boost.Interprocess</td><td>Linux x86-64, macOS, Linux ARM64: 32 MiB<br>Windows: 4 MiB</td><td class="muted">—</td><td>Linux x86-64, Windows: 4 MiB<br>macOS, Linux ARM64: 32 MiB</td><td class="muted">—</td></tr>
+<tr><td>Unix socket</td><td>the OS&#39;s</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+<tr><td>TCP loopback</td><td>the OS&#39;s</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+</tbody></table></div>
+<p class="note">Aeron's media driver conductor, which moves a publisher's flow-control limit: Linux x86-64, macOS, Linux ARM64: backs off into sleeps when idle (Aeron's default); Windows: spins.</p>
+<p class="note">The most messages one of Aeron's subscription polls took (its fragment limit; a message up to its MTU is one fragment): 1 (stream), 1 (broadcast).</p>
+<!-- /generated:buffers -->
+    <h3 style="margin-top:22px">Machines</h3>
+    <p class="note">The Linux x86-64 and Windows columns ran on one ASUS Zenbook 14 laptop on AC power (Intel Core i9-13900H: 6 P-cores with Hyper-Threading and 8 E-cores, 32&nbsp;GB), one after the other: Windows 11, then Ubuntu 24.04 in WSL2. A thread's wake-up is slow in WSL2 (about 50&nbsp;µs), which costs most the libraries that hand each message between threads (ZeroMQ, NNG). The macOS and Linux ARM64 columns ran on a MacBook Air (Apple M1: 4 performance and 4 efficiency cores, 8&nbsp;GB), one after the other: macOS 26.5, then Ubuntu 24.04 in a virtual machine (Lima on Apple's Virtualization framework, 4 vCPUs, 4&nbsp;GB). On macOS a case with more spinning processes than the 4 performance cores runs some of them on the efficiency cores. The VM's four vCPUs leave out the cases of 4 producers and 4 consumers and of 4 clients and 4 servers, eight spinning processes each (a dash in its column), and its broadcast to four subscribers runs five spinning processes on them (Aeron's media driver, which backs off into sleeps when idle there, is a sixth).</p>
+<!-- generated:machines -->
+<ul class="plain">
+<li><b>Linux x86-64:</b> 13th Gen Intel(R) Core(TM) i9-13900H, Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.39; 3 runs of 1 s after 0.3 s of warm-up, 2026-10-25.</li>
+<li><b>Windows:</b> 13th Gen Intel(R) Core(TM) i9-13900H, Windows-11-10.0.26200-SP0; 3 runs of 1 s after 0.3 s of warm-up, 2026-10-25.</li>
+<li><b>macOS:</b> Apple M1, macOS-26.5.1-arm64-arm-64bit-Mach-O; 3 runs of 1 s after 0.3 s of warm-up, 2026-10-25.</li>
+<li><b>Linux ARM64:</b> Apple M1, in a Lima VM (4 vCPUs, 4 GB), Linux-6.8.0-147-generic-aarch64-with-glibc2.39; 3 runs of 1 s after 0.3 s of warm-up, 2026-10-25.</li>
+<li><b>Versions:</b> ZeroMQ 4.3.5, NNG 2.0.0, cpp-ipc 1.4.1, iceoryx2 0.10.0, Aeron 1.53.3, Boost.Interprocess 1.92.0; FastIPC 1.0.0. The harness and the C and C++ libraries are built by MSVC 17.13 on Windows, GCC 13.3 on Linux and Apple Clang 16 on macOS, iceoryx2 by Rust 1.99 and FastIPC by Zig 0.17.0.</li>
+</ul>
+<!-- /generated:machines -->
+  </section>
+
+  <section class="plate" id="practice" aria-labelledby="h-practice">
+    <div class="plate-head"><h2 id="h-practice">In practice</h2><span class="eyebrow">bench/zig · 2026-10-24/25</span></div>
+    <p class="intro">What the cases above don't show, from FastIPC's own benchmark suite on the same machines: a receiver that sleeps, the lowest latency, messages longer than the ring, and setting up a connection.</p>
+    <div class="features">
+      <div class="feature"><span class="tag">latency-sleep · wakeup</span><h3>Waking a sleeper</h3><p>A receiver that waits in a receive call spins for 100 to 250&nbsp;µs, then sleeps. A message that comes later wakes it in about 28 to 44&nbsp;µs on Windows, 57 to 60&nbsp;µs on Linux x86-64 in WSL2, 26&nbsp;µs on macOS and 35&nbsp;µs on Linux ARM64, depending on how deeply its core slept.</p></div>
+      <div class="feature"><span class="tag">stream pace</span><h3>The receiver sets the pace</h3><p>A receiver that keeps up with its sender pulls the ring's cache lines away from the sender at every look, so each publish waits for them to come back. So a receiver that waits for a stream holds back its first looks (64 pauses on Windows, 32 on Linux x86-64, 512 on ARM64, macOS and Linux, about 4&nbsp;µs on the M1), which lifts copied 16 to 64&nbsp;B messages 1.4 to 2.4 times, and 1&nbsp;KiB on the M1 more than 3 times; one that waits for an answer looks at once. <code>zig build -Dstream_pace=N</code> builds the library for other hardware.</p></div>
+      <div class="feature"><span class="tag">any length</span><h3>Messages longer than the ring</h3><p>A message longer than the ring travels in pieces, so its length is limited only by the receiver's buffer, and copy and zero-copy then run alike: 1.5&nbsp;MiB messages through 512&nbsp;KiB rings at 8.6 to 14 thousand per second.</p></div>
+      <div class="feature"><span class="tag">fipc_stream_accept · fipc_stream_connect</span><h3>Connection setup</h3><p>Listen, connect, accept, close both ends and stop listening, with a 1&nbsp;MiB ring: 2.5 thousand cycles per second on Linux x86-64, 7.8 thousand on Windows, 4.1 thousand on macOS and 2.2 thousand on Linux ARM64. Set up a connection once, not for each exchange.</p></div>
+      <div class="feature"><span class="tag">Windows throttling · macOS background</span><h3>Quality of service</h3><p>Started from a background process, Windows 11 runs a process on its efficiency cores unless power throttling is off for it: 64&nbsp;KiB messages fall from about 430 to 210 to 280 thousand per second. macOS has its counterpart, the background state, which runs a process and its children on the M1's efficiency cores (copied 1&nbsp;KiB messages at 7 million per second instead of 27 million). The benchmarks turn the throttling off and leave the background state; an application that needs the speed should do the same.</p></div>
+    </div>
+    <div class="stack" style="margin-top:22px">
+    <h3 id="busy-polling">Lowest latency: busy-polling</h3>
+    <p>For the lowest latency at any message rate, poll instead of waiting: call <code>fipc_recv</code> (or <code>fipc_recv_acquire</code>, or a binding's receive) with timeout 0 in a loop, and call again on <code>FIPC_TIMEOUT</code>. A call that finds nothing makes no system call and reads no clock: it looks at the ring's indices, pauses for a spin hint and looks once more, checks the connection's state and returns, in about 50&nbsp;ns on x86. The polling thread holds one core at 100%.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">One 32 B message per millisecond, its age on arrival</th><th scope="col" class="n">Linux x86-64 p50</th><th scope="col" class="n">p99</th><th scope="col" class="n">Windows p50</th><th scope="col" class="n">p99</th></tr></thead>
+        <tbody>
+          <tr><td>Receiver waits in <code>fipc_recv</code> (<code>wakeup</code>)</td><td class="n">58.5 µs</td><td class="n">143 µs</td><td class="n">30.3 µs</td><td class="n">140 µs</td></tr>
+          <tr><td>Receiver polls with timeout 0 (<code>wakeup-poll</code>)</td><td class="n">222 ns</td><td class="n">18.7 µs</td><td class="n">217 ns</td><td class="n">8.4 µs</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Unpinned, 2026-10-25. On the M1 a polling receiver gets the message in 83&nbsp;ns under macOS and 125&nbsp;ns under Linux. The p99 is the operating system's: interrupts and the scheduler take the polling core away for 1 to 2% of the time in gaps over a microsecond, and a message sent during one waits for the thread to run again.</p>
+    </div>
+  </section>
+
+  <section class="plate" id="bindings" aria-labelledby="h-bind">
+    <div class="plate-head"><h2 id="h-bind">By language</h2><span class="eyebrow">bench/zig · bench/c · bench/csharp · bench/java · bench/python · bench/rust · bench/lua · bench/js · bench/go</span></div>
+    <p class="intro">What each language's binding costs: copied messages per second between two processes, and under each the bytes of message per second, through each language's own benchmark, on the same machines as the comparison. Short messages show the cost of each call into the library; at 64&nbsp;KiB the copy itself dominates and most languages run close to C. Medians of 5 runs round-robin, release builds, 512&nbsp;KiB rings; Linux x86-64 and Windows 2026-10-25, macOS and Linux ARM64 the same night, 2026-10-24 to 25; every size and the zero-copy calls are in <a href="https://github.com/fastipc/fastipc/blob/main/docs/perf/bindings-baseline.md">bindings-baseline.md</a>.</p>
+    <div class="table-wrap">
+      <table class="data rates">
+        <colgroup><col><col span="4" class="g"><col span="4" class="g"></colgroup>
+        <thead>
+          <tr><th scope="col" rowspan="2">Language</th><th scope="colgroup" colspan="4" class="grp">16 B</th><th scope="colgroup" colspan="4" class="grp">64 KiB</th></tr>
+          <tr><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th><th scope="col" class="n">Linux x86-64</th><th scope="col" class="n">Windows</th><th scope="col" class="n">macOS</th><th scope="col" class="n">Linux ARM64</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Zig</td><td class="n">48.75M<small>744 MiB/s</small></td><td class="n">50.03M<small>763 MiB/s</small></td><td class="n">108.25M<small>1652 MiB/s</small></td><td class="n">107.53M<small>1641 MiB/s</small></td><td class="n">448.9K<small>27.4 GiB/s</small></td><td class="n">442.6K<small>27.0 GiB/s</small></td><td class="n">640.5K<small>39.1 GiB/s</small></td><td class="n">662.5K<small>40.4 GiB/s</small></td></tr>
+          <tr><td>C</td><td class="n">50.04M<small>764 MiB/s</small></td><td class="n">50.14M<small>765 MiB/s</small></td><td class="n">100.63M<small>1535 MiB/s</small></td><td class="n">127.84M<small>1951 MiB/s</small></td><td class="n">459.2K<small>28.0 GiB/s</small></td><td class="n">447.7K<small>27.3 GiB/s</small></td><td class="n">623.4K<small>38.1 GiB/s</small></td><td class="n">653.5K<small>39.9 GiB/s</small></td></tr>
+          <tr><td>C++</td><td class="n">41.41M<small>632 MiB/s</small></td><td class="n">44.55M<small>680 MiB/s</small></td><td class="n">98.59M<small>1504 MiB/s</small></td><td class="n">99.16M<small>1513 MiB/s</small></td><td class="n">437.1K<small>26.7 GiB/s</small></td><td class="n">403.8K<small>24.6 GiB/s</small></td><td class="n">618.0K<small>37.7 GiB/s</small></td><td class="n">663.0K<small>40.5 GiB/s</small></td></tr>
+          <tr><td>Rust</td><td class="n">42.35M<small>646 MiB/s</small></td><td class="n">40.57M<small>619 MiB/s</small></td><td class="n">98.58M<small>1504 MiB/s</small></td><td class="n">99.63M<small>1520 MiB/s</small></td><td class="n">457.7K<small>27.9 GiB/s</small></td><td class="n">434.8K<small>26.5 GiB/s</small></td><td class="n">639.6K<small>39.0 GiB/s</small></td><td class="n">664.9K<small>40.6 GiB/s</small></td></tr>
+          <tr><td>Lua (LuaJIT)</td><td class="n">49.24M<small>751 MiB/s</small></td><td class="n">50.92M<small>777 MiB/s</small></td><td class="n">122.02M<small>1862 MiB/s</small></td><td class="n">127.46M<small>1945 MiB/s</small></td><td class="n">427.7K<small>26.1 GiB/s</small></td><td class="n">397.0K<small>24.2 GiB/s</small></td><td class="n">596.7K<small>36.4 GiB/s</small></td><td class="n">546.3K<small>33.3 GiB/s</small></td></tr>
+          <tr><td>C#</td><td class="n">37.42M<small>571 MiB/s</small></td><td class="n">30.85M<small>471 MiB/s</small></td><td class="n">65.43M<small>998 MiB/s</small></td><td class="n">72.86M<small>1112 MiB/s</small></td><td class="n">462.3K<small>28.2 GiB/s</small></td><td class="n">444.7K<small>27.1 GiB/s</small></td><td class="n">545.6K<small>33.3 GiB/s</small></td><td class="n">606.9K<small>37.0 GiB/s</small></td></tr>
+          <tr><td>Java</td><td class="n">13.70M<small>209 MiB/s</small></td><td class="n">14.90M<small>227 MiB/s</small></td><td class="n">35.45M<small>541 MiB/s</small></td><td class="n">26.71M<small>408 MiB/s</small></td><td class="n">432.4K<small>26.4 GiB/s</small></td><td class="n">421.2K<small>25.7 GiB/s</small></td><td class="n">598.7K<small>36.5 GiB/s</small></td><td class="n">632.9K<small>38.6 GiB/s</small></td></tr>
+          <tr><td>Go</td><td class="n">8.76M<small>134 MiB/s</small></td><td class="n">10.49M<small>160 MiB/s</small></td><td class="n">10.27M<small>157 MiB/s</small></td><td class="n">10.42M<small>159 MiB/s</small></td><td class="n">416.5K<small>25.4 GiB/s</small></td><td class="n">446.7K<small>27.3 GiB/s</small></td><td class="n">602.3K<small>36.8 GiB/s</small></td><td class="n">594.5K<small>36.3 GiB/s</small></td></tr>
+          <tr><td>JavaScript</td><td class="n">2.45M<small>37 MiB/s</small></td><td class="n">2.10M<small>32 MiB/s</small></td><td class="n">3.53M<small>54 MiB/s</small></td><td class="n">2.21M<small>34 MiB/s</small></td><td class="n">361.2K<small>22.0 GiB/s</small></td><td class="n">354.1K<small>21.6 GiB/s</small></td><td class="n">543.8K<small>33.2 GiB/s</small></td><td class="n">249.7K<small>15.2 GiB/s</small></td></tr>
+          <tr><td>Python</td><td class="n">1.23M<small>19 MiB/s</small></td><td class="n">1.47M<small>22 MiB/s</small></td><td class="n">1.92M<small>29 MiB/s</small></td><td class="n">1.10M<small>17 MiB/s</small></td><td class="n">323.0K<small>19.7 GiB/s</small></td><td class="n">341.9K<small>20.9 GiB/s</small></td><td class="n">458.9K<small>28.0 GiB/s</small></td><td class="n">375.0K<small>22.9 GiB/s</small></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <ul class="plain">
+        <li><b>Runtimes:</b> Zig is the library's own suite, which calls <code>fipc.h</code> directly, on Zig 0.17.0. C and C++ are one harness, the same loops through <code>fipc.h</code> and through <code>fipc.hpp</code>, built ReleaseFast by Zig's bundled Clang 22. Rust 1.99 through its safe API; LuaJIT 2.1; C# on .NET 9 through the raw layer <code>Fipc</code>; Java on JDK 25 (Temurin); Go 1.27.1 without cgo; JavaScript on Node.js 22 through the async calls, each awaited; CPython 3.13 on Windows and macOS, 3.12 on Linux.</li>
+        <li><b>Timing:</b> each case is timed after an untimed warm-up of at least 0.2&nbsp;s (0.5&nbsp;s on the JITs: C#, Java, LuaJIT, Node.js), from a start marker the client sends after it. The 16&nbsp;B case times 2 million messages, tens of milliseconds for a native language, so scheduling noise is large (±20 to 30%).</li>
+        <li>Reproduce with <code>python devtool.py bench &lt;language&gt;-fastipc</code> (<code>c-</code>, <code>cpp-</code>, <code>python-</code>, <code>csharp-</code>, <code>java-</code>, <code>rust-</code>, <code>lua-</code>, <code>js-</code>, <code>go-</code>), or <code>bench zig-all</code> for the suite.</li>
+      </ul>
+      <ul class="plain">
+        <li><b>Go</b> calls into the library through purego, each call behind a mutex of its direction: that costs more than copying a short message. Zero-copy takes two calls per message on each side where a copy takes one, so in Go it runs slower than copying for short messages (5.5 to 7.4 million 16-byte messages per second); from 64&nbsp;KiB on, Go runs as fast as the other languages.</li>
+        <li><b>C#:</b> the object layer (<code>FipcConnection</code>) adds about 25 to 50&nbsp;ns per message over the raw layer on both OSes, nearly all of it the SafeHandle's reference count: for 16-byte copies, 84&nbsp;ns against 40&nbsp;ns per send and receive on Windows, 77&nbsp;ns against 41&nbsp;ns on Linux, in one process with no waiting.</li>
+        <li><b>JavaScript</b> runs about twice as many short messages through the <code>Sync</code> calls as through the async calls shown.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="plate" id="faq" aria-labelledby="h-faq">
+    <div class="plate-head"><h2 id="h-faq">Questions</h2><span class="eyebrow">FAQ</span></div>
+<!-- generated:faq -->
+<dl class="faq">
+<dt>What is the fastest IPC library?</dt>
+<dd><p>It depends on the pattern and the message. FastIPC is the fastest, or level with the fastest, in 28 of the 30 measurements of the case-by-case table; Aeron leads the other 2. Of the libraries here, only FastIPC has all four patterns (stream, broadcast, work queue and service) in shared memory. (<a href="#cases">Case by case</a>.)</p></dd>
+<dt>How does FastIPC compare with Aeron?</dt>
+<dd><p>Aeron is the closest rival. FastIPC has the lower round-trip latency on Linux x86-64 and Windows, and the two are about even on macOS and Linux ARM64. FastIPC leads 16-byte one-way throughput on Windows, macOS and Linux ARM64, and Aeron leads on Linux x86-64 (by 12%). FastIPC leads it at 1 KiB on every platform here. Aeron also works across machines, over UDP. On one machine FastIPC is simpler to set up: Aeron needs a media driver running, as a process of its own or embedded in one of the applications. Either library can let an idle receiver sleep, but a sleeping Aeron receiver sees a new message only when its sleep ends, whereas FastIPC's sender wakes its receiver as soon as it sends. Aeron has no work queue or request-reply service. (<a href="#stream">Charts above</a>; details in <a href="#aeron-note">Aeron in detail</a>.)</p></dd>
+<dt>Is FastIPC faster than ZeroMQ?</dt>
+<dd><p>Yes, in every one of the 72 measurements where both ran: a 16-byte round trip, for example, is 240 to 478 times as quick. ZeroMQ passes each message through a socket and its own I/O threads, while FastIPC writes it into memory both processes map. ZeroMQ also works across machines; FastIPC works within one.</p></dd>
+<dt>How does FastIPC compare with iceoryx2?</dt>
+<dd><p>Both are shared-memory libraries without a broker. FastIPC is faster in every one of the 68 measurements where both ran; its request-reply calls, for example, run 3.1 to 3.6 times as fast. iceoryx2 has no work queue and delivers each request to every server, so its servers don't share a load. It has events and a blackboard, and runs on more platforms (QNX, FreeBSD and others).</p></dd>
+<dt>How does FastIPC compare with NNG (nanomsg)?</dt>
+<dd><p>NNG passes each message through its own threads, and every hand-over between threads costs a wake-up, so it is far slower here: a 16-byte round trip is 195 to 1,077 times as quick with FastIPC. NNG works across machines; FastIPC works within one.</p></dd>
+<dt>Is shared memory faster than a Unix domain socket?</dt>
+<dd><p>Yes. Here a 16-byte round trip through FastIPC's shared memory is 11 to 20 times as quick as over a Unix domain socket. A socket costs a system call and a copy through the kernel for every send and receive; shared memory needs neither once the connection is set up.</p></dd>
+<dt>Can I run these benchmarks myself?</dt>
+<dd><p>Yes. <code>bench/alternatives</code> in the repository fetches and builds every library at the version shown and builds the harness with CMake, and <code>run.py</code> runs every case and writes the medians. The README there has the commands, and the method above says what each case does.</p></dd>
+</dl>
+<!-- /generated:faq -->
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>FastIPC 1.0.0 · MIT License · by Hayden Donnelly</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/fastipc/fastipc">GitHub</a>
+      <a href="https://pypi.org/project/fipc-python/">PyPI</a>
+      <a href="https://www.nuget.org/packages/Fipc">NuGet</a>
+      <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
+      <a href="https://crates.io/crates/fipc">crates.io</a>
+      <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
+      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
+      <a href="https://github.com/fastipc/fastipc/tree/main/bench/alternatives">bench/alternatives</a>
+      <a href="https://github.com/fastipc/fastipc/blob/main/docs/perf/baseline.md">baseline.md</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js?v=42823dbe"></script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+{
+ "os": "linux",
+ "cpu": "aarch64",
+ "platform": "Linux-6.8.0-147-generic-aarch64-with-glibc2.39",
+ "date": "2026-10-25",
+ "versions": {
+  "zmq": "v4.3.5",
+  "nng": "v2.0.0",
+  "cpp-ipc": "v1.4.1",
+  "iceoryx2": "v0.10.0",
+  "aeron": "1.53.3",
+  "boost": "1.92.0"
+ },
+ "runs": 3,
+ "duration_ms": 1000,
+ "warmup_ms": 300,
+ "poll": false,
+ "buffer": null,
+ "platform_key": "linux-arm64",
+ "aeron_conductor": "backoff",
+ "aeron_fragment_limit": 64,
+ "batch": 64,
+ "results": {
+  "stream-16": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 131292748.32242115,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 129920482.10828899,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 127325993.22244273,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 64,
+    "msgs_per_s": 129920482.10828899,
+    "lost": 0
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 118496312.42291251,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 114260950.20385747,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 117078798.78847888,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 64,
+    "conductor": "backoff",
+    "fragment_limit": 64,
+    "msgs_per_s": 117078798.78847888,
+    "lost": 0
+   }
+  },
+  "stream-1024": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 32347467.130300175,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 32040560.31474319,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 32282908.02684964,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 64,
+    "msgs_per_s": 32282908.02684964,
+    "lost": 0
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 16992628.379607264,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 17579252.745435897,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 18121369.42699708,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 64,
+    "conductor": "backoff",
+    "fragment_limit": 64,
+    "msgs_per_s": 17579252.745435897,
+    "lost": 0
+   }
+  },
+  "broadcast-1-lossless-16": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 103178960.36918035,
+      "lost_pct": 0.0,
+      "sent_per_s": 103207726.7987122
+     },
+     {
+      "msgs_per_s": 110660202.94174732,
+      "lost_pct": 0.0,
+      "sent_per_s": 110701051.38745621
+     },
+     {
+      "msgs_per_s": 108860411.71325709,
+      "lost_pct": 0.0,
+      "sent_per_s": 108896082.62663223
+     }
+    ],
+    "buffer_bytes": 33554432,
+    "batch": 64,
+    "msgs_per_s": 108860411.71325709,
+    "lost_pct": 0.0,
+    "sent_per_s": 108896082.62663223
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 99107023.52190658,
+      "lost_pct": 0.0,
+      "sent_per_s": 99192157.2898063
+     },
+     {
+      "msgs_per_s": 98028144.92155223,
+      "lost_pct": 0.0,
+      "sent_per_s": 98026365.55675487
+     },
+     {
+      "msgs_per_s": 103551277.12868346,
+      "lost_pct": 0.0,
+      "sent_per_s": 103639969.7716755
+     }
+    ],
+    "buffer_bytes": 33554432,
+    "batch": 64,
+    "conductor": "backoff",
+    "fragment_limit": 64,
+    "msgs_per_s": 99107023.52190658,
+    "lost_pct": 0.0,
+    "sent_per_s": 99192157.2898063
+   }
+  },
+  "broadcast-4-lossless-16": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 59093607.70520299,
+      "lost_pct": 0.0,
+      "sent_per_s": 59106345.83512031
+     },
+     {
+      "msgs_per_s": 60473946.67413978,
+      "lost_pct": 0.0,
+      "sent_per_s": 60556590.337661155
+     },
+     {
+      "msgs_per_s": 60391854.26471294,
+      "lost_pct": 0.0,
+      "sent_per_s": 60717296.82067579
+     }
+    ],
+    "buffer_bytes": 33554432,
+    "batch": 64,
+    "msgs_per_s": 60391854.26471294,
+    "lost_pct": 0.0,
+    "sent_per_s": 60556590.337661155
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 41163986.202554025,
+      "lost_pct": 0.0,
+      "sent_per_s": 41196795.40385562
+     },
+     {
+      "msgs_per_s": 41687417.71115415,
+      "lost_pct": 0.0,
+      "sent_per_s": 41907088.276644796
+     },
+     {
+      "msgs_per_s": 40158916.23147906,
+      "lost_pct": 0.0,
+      "sent_per_s": 40153879.02758707
+     }
+    ],
+    "buffer_bytes": 33554432,
+    "batch": 64,
+    "conductor": "backoff",
+    "fragment_limit": 64,
+    "msgs_per_s": 41163986.202554025,
+    "lost_pct": 0.0,
+    "sent_per_s": 41196795.40385562
+   }
+  }
+ }
+}

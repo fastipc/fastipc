@@ -1,0 +1,217 @@
+{
+ "os": "windows",
+ "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+ "platform": "Windows-11-10.0.26200-SP0",
+ "date": "2026-10-25",
+ "versions": {
+  "zmq": "v4.3.5",
+  "nng": "v2.0.0",
+  "cpp-ipc": "v1.4.1",
+  "iceoryx2": "v0.10.0",
+  "aeron": "1.53.3",
+  "boost": "1.92.0"
+ },
+ "runs": 3,
+ "duration_ms": 1000,
+ "warmup_ms": 300,
+ "poll": false,
+ "buffer": null,
+ "platform_key": "windows",
+ "aeron_conductor": "spin",
+ "aeron_fragment_limit": 16,
+ "batch": 16,
+ "results": {
+  "stream-16": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 111489855.30019034,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 113388606.54073235,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 111039374.49192747,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 16,
+    "msgs_per_s": 111489855.30019034,
+    "lost": 0
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 122799818.9461032,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 119388956.12684262,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 112789192.76459792,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 524288,
+    "batch": 16,
+    "conductor": "spin",
+    "fragment_limit": 16,
+    "msgs_per_s": 119388956.12684262,
+    "lost": 0
+   }
+  },
+  "stream-1024": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 33935517.62207762,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 34595811.00192499,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 34499166.16089454,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 16,
+    "msgs_per_s": 34499166.16089454,
+    "lost": 0
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 26331574.402091783,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 27090641.387574885,
+      "lost": 0
+     },
+     {
+      "msgs_per_s": 26754564.52217996,
+      "lost": 0
+     }
+    ],
+    "buffer_bytes": 524288,
+    "batch": 16,
+    "conductor": "spin",
+    "fragment_limit": 16,
+    "msgs_per_s": 26754564.52217996,
+    "lost": 0
+   }
+  },
+  "broadcast-1-lossless-16": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 105233193.55808264,
+      "lost_pct": 0.0,
+      "sent_per_s": 105241220.40853213
+     },
+     {
+      "msgs_per_s": 101256321.69568212,
+      "lost_pct": 0.0,
+      "sent_per_s": 101259126.26358195
+     },
+     {
+      "msgs_per_s": 104987799.7861694,
+      "lost_pct": 0.0,
+      "sent_per_s": 104991008.48739958
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 16,
+    "msgs_per_s": 104987799.7861694,
+    "lost_pct": 0.0,
+    "sent_per_s": 104991008.48739958
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 110836232.19427331,
+      "lost_pct": 0.0,
+      "sent_per_s": 110839357.78645784
+     },
+     {
+      "msgs_per_s": 107854411.05143872,
+      "lost_pct": 0.0,
+      "sent_per_s": 107854508.62718017
+     },
+     {
+      "msgs_per_s": 106565419.8594176,
+      "lost_pct": 0.0,
+      "sent_per_s": 106566565.06674111
+     }
+    ],
+    "buffer_bytes": 524288,
+    "batch": 16,
+    "conductor": "spin",
+    "fragment_limit": 16,
+    "msgs_per_s": 107854411.05143872,
+    "lost_pct": 0.0,
+    "sent_per_s": 107854508.62718017
+   }
+  },
+  "broadcast-4-lossless-16": {
+   "fastipc": {
+    "runs": [
+     {
+      "msgs_per_s": 86519191.45537636,
+      "lost_pct": 0.0,
+      "sent_per_s": 86519228.36038686
+     },
+     {
+      "msgs_per_s": 86435325.01321948,
+      "lost_pct": 0.0,
+      "sent_per_s": 86439486.9033518
+     },
+     {
+      "msgs_per_s": 83269124.40839604,
+      "lost_pct": 0.0,
+      "sent_per_s": 83335244.72352435
+     }
+    ],
+    "buffer_bytes": 4194304,
+    "batch": 16,
+    "msgs_per_s": 86435325.01321948,
+    "lost_pct": 0.0,
+    "sent_per_s": 86439486.9033518
+   },
+   "aeron": {
+    "runs": [
+     {
+      "msgs_per_s": 85510542.09493558,
+      "lost_pct": 0.0,
+      "sent_per_s": 85518007.1775776
+     },
+     {
+      "msgs_per_s": 79521074.78333126,
+      "lost_pct": 0.0,
+      "sent_per_s": 79525483.07793961
+     },
+     {
+      "msgs_per_s": 78472885.08078825,
+      "lost_pct": 0.0,
+      "sent_per_s": 78472690.26659483
+     }
+    ],
+    "buffer_bytes": 524288,
+    "batch": 16,
+    "conductor": "spin",
+    "fragment_limit": 16,
+    "msgs_per_s": 79521074.78333126,
+    "lost_pct": 0.0,
+    "sent_per_s": 79525483.07793961
+   }
+  }
+ }
+}

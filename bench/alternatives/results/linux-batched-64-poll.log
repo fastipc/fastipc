@@ -1,0 +1,8 @@
+stream-16                    fastipc       msgs_per_s=119.86M  lost=0
+stream-16                    aeron         msgs_per_s=94.89M  lost=0
+stream-1024                  fastipc       msgs_per_s=27.04M  lost=0
+stream-1024                  aeron         msgs_per_s=15.90M  lost=0
+broadcast-1-lossless-16      fastipc       msgs_per_s=108.55M  lost_pct=0.0%  sent_per_s=108.55M
+broadcast-1-lossless-16      aeron         msgs_per_s=97.78M  lost_pct=0.0%  sent_per_s=97.78M
+broadcast-4-lossless-16      fastipc       msgs_per_s=88.42M  lost_pct=0.0%  sent_per_s=88.42M
+broadcast-4-lossless-16      aeron         msgs_per_s=82.10M  lost_pct=0.0%  sent_per_s=82.13M

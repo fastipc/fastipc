@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="328" viewBox="0 0 760 328" role="img" aria-label="Service, 1 client × 1 server: 16-byte calls per second">
+<style>
+  .bg { fill: #fcfbf9; stroke: #d8d7d3; } .t { fill: #1f2023; } .m { fill: #5a5c61; } .self { fill: #a64b0c; }
+  .lx { fill: #4f7ca6; } .wn { fill: #d0691c; } .mc { fill: #5f6166; } .la { fill: #2a8a74; } .rule { stroke: #e5e4e0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #1c1b1a; stroke: #3a3937; } .t { fill: #ecebe9; } .m { fill: #a4a3a1; } .self { fill: #eba02f; }
+    .lx { fill: #6b9ac6; } .wn { fill: #d97a2a; } .mc { fill: #b3b2af; } .la { fill: #3cb398; } .rule { stroke: #2b2a28; }
+  }
+  text { font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 12px; }
+  .num { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 11px; }
+  .title { font-size: 15px; font-weight: 600; } .lib { font-size: 13px; } .self.lib { font-weight: 700; }
+</style>
+<rect class="bg" x="0.5" y="0.5" width="759" height="327" rx="6"/>
+<text class="t title" x="16" y="28">Service, 1 client × 1 server: 16-byte calls per second</text>
+<rect class="lx" x="16" y="41" width="10" height="10" rx="2"/><text class="m" x="30" y="50">Linux x86-64</text>
+<rect class="wn" x="134.4" y="41" width="10" height="10" rx="2"/><text class="m" x="148.4" y="50">Windows</text>
+<rect class="mc" x="216.8" y="41" width="10" height="10" rx="2"/><text class="m" x="230.8" y="50">macOS</text>
+<rect class="la" x="284.8" y="41" width="10" height="10" rx="2"/><text class="m" x="298.8" y="50">Linux ARM64</text>
+<line class="rule" x1="16" x2="744" y1="59.0" y2="59.0"/>
+<text class="self lib" x="16" y="94.0">FastIPC</text>
+<rect class="lx" x="150" y="64" width="400.5" height="11" rx="1.5"/><text class="m num" x="555.5" y="74">3.36M</text>
+<rect class="wn" x="150" y="77" width="359.7" height="11" rx="1.5"/><text class="m num" x="514.7" y="87">3.01M</text>
+<rect class="mc" x="150" y="90" width="510.0" height="11" rx="1.5"/><text class="m num" x="665.0" y="100">4.27M</text>
+<rect class="la" x="150" y="103" width="459.5" height="11" rx="1.5"/><text class="m num" x="614.5" y="113">3.85M</text>
+<line class="rule" x1="16" x2="744" y1="121.0" y2="121.0"/>
+<text class="t lib" x="16" y="156.0">iceoryx2</text>
+<rect class="lx" x="150" y="126" width="111.3" height="11" rx="1.5"/><text class="m num" x="266.3" y="136">933.1K</text>
+<rect class="wn" x="150" y="139" width="108.9" height="11" rx="1.5"/><text class="m num" x="263.9" y="149">912.5K</text>
+<rect class="mc" x="150" y="152" width="160.3" height="11" rx="1.5"/><text class="m num" x="315.3" y="162">1.34M</text>
+<rect class="la" x="150" y="165" width="148.3" height="11" rx="1.5"/><text class="m num" x="303.3" y="175">1.24M</text>
+<line class="rule" x1="16" x2="744" y1="183.0" y2="183.0"/>
+<text class="t lib" x="16" y="218.0">ZeroMQ</text>
+<rect class="lx" x="150" y="188" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="198">12.3K</text>
+<rect class="wn" x="150" y="201" width="2.2" height="11" rx="1.5"/><text class="m num" x="157.2" y="211">18.2K</text>
+<rect class="mc" x="150" y="214" width="2.7" height="11" rx="1.5"/><text class="m num" x="157.7" y="224">23.0K</text>
+<rect class="la" x="150" y="227" width="3.0" height="11" rx="1.5"/><text class="m num" x="158.0" y="237">24.9K</text>
+<line class="rule" x1="16" x2="744" y1="245.0" y2="245.0"/>
+<text class="t lib" x="16" y="280.0">NNG</text>
+<rect class="lx" x="150" y="250" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="260">8.32K</text>
+<rect class="wn" x="150" y="263" width="2.3" height="11" rx="1.5"/><text class="m num" x="157.3" y="273">19.6K</text>
+<rect class="mc" x="150" y="276" width="4.8" height="11" rx="1.5"/><text class="m num" x="159.8" y="286">40.4K</text>
+<rect class="la" x="150" y="289" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="299">7.20K</text>
+</svg>

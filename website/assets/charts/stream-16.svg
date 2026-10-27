@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="638" viewBox="0 0 760 638" role="img" aria-label="Stream: 16-byte messages per second, one way">
+<style>
+  .bg { fill: #fcfbf9; stroke: #d8d7d3; } .t { fill: #1f2023; } .m { fill: #5a5c61; } .self { fill: #a64b0c; }
+  .lx { fill: #4f7ca6; } .wn { fill: #d0691c; } .mc { fill: #5f6166; } .la { fill: #2a8a74; } .rule { stroke: #e5e4e0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #1c1b1a; stroke: #3a3937; } .t { fill: #ecebe9; } .m { fill: #a4a3a1; } .self { fill: #eba02f; }
+    .lx { fill: #6b9ac6; } .wn { fill: #d97a2a; } .mc { fill: #b3b2af; } .la { fill: #3cb398; } .rule { stroke: #2b2a28; }
+  }
+  text { font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 12px; }
+  .num { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 11px; }
+  .title { font-size: 15px; font-weight: 600; } .lib { font-size: 13px; } .self.lib { font-weight: 700; }
+</style>
+<rect class="bg" x="0.5" y="0.5" width="759" height="637" rx="6"/>
+<text class="t title" x="16" y="28">Stream: 16-byte messages per second, one way</text>
+<rect class="lx" x="16" y="41" width="10" height="10" rx="2"/><text class="m" x="30" y="50">Linux x86-64</text>
+<rect class="wn" x="134.4" y="41" width="10" height="10" rx="2"/><text class="m" x="148.4" y="50">Windows</text>
+<rect class="mc" x="216.8" y="41" width="10" height="10" rx="2"/><text class="m" x="230.8" y="50">macOS</text>
+<rect class="la" x="284.8" y="41" width="10" height="10" rx="2"/><text class="m" x="298.8" y="50">Linux ARM64</text>
+<line class="rule" x1="16" x2="744" y1="59.0" y2="59.0"/>
+<text class="self lib" x="16" y="94.0">FastIPC</text>
+<rect class="lx" x="150" y="64" width="312.2" height="11" rx="1.5"/><text class="m num" x="467.2" y="74">50.3M</text>
+<rect class="wn" x="150" y="77" width="325.9" height="11" rx="1.5"/><text class="m num" x="480.9" y="87">52.5M</text>
+<rect class="mc" x="150" y="90" width="510.0" height="11" rx="1.5"/><text class="m num" x="665.0" y="100">82.1M</text>
+<rect class="la" x="150" y="103" width="449.7" height="11" rx="1.5"/><text class="m num" x="604.7" y="113">72.4M</text>
+<line class="rule" x1="16" x2="744" y1="121.0" y2="121.0"/>
+<text class="t lib" x="16" y="156.0">Aeron</text>
+<rect class="lx" x="150" y="126" width="351.0" height="11" rx="1.5"/><text class="m num" x="506.0" y="136">56.5M</text>
+<rect class="wn" x="150" y="139" width="293.8" height="11" rx="1.5"/><text class="m num" x="448.8" y="149">47.3M</text>
+<rect class="mc" x="150" y="152" width="357.9" height="11" rx="1.5"/><text class="m num" x="512.9" y="162">57.6M</text>
+<rect class="la" x="150" y="165" width="314.1" height="11" rx="1.5"/><text class="m num" x="469.1" y="175">50.6M</text>
+<line class="rule" x1="16" x2="744" y1="183.0" y2="183.0"/>
+<text class="t lib" x="16" y="218.0">ZeroMQ</text>
+<rect class="lx" x="150" y="188" width="48.7" height="11" rx="1.5"/><text class="m num" x="203.7" y="198">7.84M</text>
+<rect class="wn" x="150" y="201" width="52.4" height="11" rx="1.5"/><text class="m num" x="207.4" y="211">8.44M</text>
+<rect class="mc" x="150" y="214" width="45.8" height="11" rx="1.5"/><text class="m num" x="200.8" y="224">7.38M</text>
+<rect class="la" x="150" y="227" width="60.4" height="11" rx="1.5"/><text class="m num" x="215.4" y="237">9.73M</text>
+<line class="rule" x1="16" x2="744" y1="245.0" y2="245.0"/>
+<text class="t lib" x="16" y="280.0">Boost.Interprocess</text>
+<rect class="lx" x="150" y="250" width="44.8" height="11" rx="1.5"/><text class="m num" x="199.8" y="260">7.22M</text>
+<rect class="wn" x="150" y="263" width="22.2" height="11" rx="1.5"/><text class="m num" x="177.2" y="273">3.57M</text>
+<rect class="mc" x="150" y="276" width="63.2" height="11" rx="1.5"/><text class="m num" x="218.2" y="286">10.2M</text>
+<rect class="la" x="150" y="289" width="36.1" height="11" rx="1.5"/><text class="m num" x="191.1" y="299">5.82M</text>
+<line class="rule" x1="16" x2="744" y1="307.0" y2="307.0"/>
+<text class="t lib" x="16" y="342.0">iceoryx2</text>
+<rect class="lx" x="150" y="312" width="22.6" height="11" rx="1.5"/><text class="m num" x="177.6" y="322">3.63M</text>
+<rect class="wn" x="150" y="325" width="20.1" height="11" rx="1.5"/><text class="m num" x="175.1" y="335">3.23M</text>
+<rect class="mc" x="150" y="338" width="39.0" height="11" rx="1.5"/><text class="m num" x="194.0" y="348">6.27M</text>
+<rect class="la" x="150" y="351" width="34.7" height="11" rx="1.5"/><text class="m num" x="189.7" y="361">5.59M</text>
+<line class="rule" x1="16" x2="744" y1="369.0" y2="369.0"/>
+<text class="t lib" x="16" y="404.0">cpp-ipc</text>
+<rect class="lx" x="150" y="374" width="14.5" height="11" rx="1.5"/><text class="m num" x="169.5" y="384">2.34M</text>
+<rect class="wn" x="150" y="387" width="6.3" height="11" rx="1.5"/><text class="m num" x="161.3" y="397">1.01M</text>
+<text class="m num" x="150" y="410">—</text>
+<rect class="la" x="150" y="413" width="16.1" height="11" rx="1.5"/><text class="m num" x="171.1" y="423">2.59M</text>
+<line class="rule" x1="16" x2="744" y1="431.0" y2="431.0"/>
+<text class="t lib" x="16" y="466.0">Unix socket</text>
+<rect class="lx" x="150" y="436" width="13.5" height="11" rx="1.5"/><text class="m num" x="168.5" y="446">2.17M</text>
+<rect class="wn" x="150" y="449" width="6.1" height="11" rx="1.5"/><text class="m num" x="161.1" y="459">986.9K</text>
+<rect class="mc" x="150" y="462" width="12.4" height="11" rx="1.5"/><text class="m num" x="167.4" y="472">2.00M</text>
+<rect class="la" x="150" y="475" width="14.4" height="11" rx="1.5"/><text class="m num" x="169.4" y="485">2.33M</text>
+<line class="rule" x1="16" x2="744" y1="493.0" y2="493.0"/>
+<text class="t lib" x="16" y="528.0">TCP loopback</text>
+<rect class="lx" x="150" y="498" width="3.5" height="11" rx="1.5"/><text class="m num" x="158.5" y="508">558.8K</text>
+<rect class="wn" x="150" y="511" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="521">115.2K</text>
+<rect class="mc" x="150" y="524" width="3.4" height="11" rx="1.5"/><text class="m num" x="158.4" y="534">548.6K</text>
+<rect class="la" x="150" y="537" width="3.6" height="11" rx="1.5"/><text class="m num" x="158.6" y="547">572.3K</text>
+<line class="rule" x1="16" x2="744" y1="555.0" y2="555.0"/>
+<text class="t lib" x="16" y="590.0">NNG</text>
+<rect class="lx" x="150" y="560" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="570">19.4K</text>
+<rect class="wn" x="150" y="573" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="583">52.5K</text>
+<rect class="mc" x="150" y="586" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="596">92.8K</text>
+<rect class="la" x="150" y="599" width="1.5" height="11" rx="1.5"/><text class="m num" x="156.5" y="609">135.4K</text>
+</svg>

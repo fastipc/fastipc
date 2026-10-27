@@ -1,0 +1,11 @@
+.{
+    .name = .zig_examples,
+    .version = "1.0.0",
+    .fingerprint = 0x1e13e4c560709b94,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        // From a checkout, by path. Elsewhere: `zig fetch --save git+https://github.com/fastipc/fastipc`
+        .fipc = .{ .path = "../.." },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}

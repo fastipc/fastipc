@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="638" viewBox="0 0 760 638" role="img" aria-label="Round trip, 16 B, median (shorter is better; log scale)">
+<style>
+  .bg { fill: #fcfbf9; stroke: #d8d7d3; } .t { fill: #1f2023; } .m { fill: #5a5c61; } .self { fill: #a64b0c; }
+  .lx { fill: #4f7ca6; } .wn { fill: #d0691c; } .mc { fill: #5f6166; } .la { fill: #2a8a74; } .rule { stroke: #e5e4e0; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #1c1b1a; stroke: #3a3937; } .t { fill: #ecebe9; } .m { fill: #a4a3a1; } .self { fill: #eba02f; }
+    .lx { fill: #6b9ac6; } .wn { fill: #d97a2a; } .mc { fill: #b3b2af; } .la { fill: #3cb398; } .rule { stroke: #2b2a28; }
+  }
+  text { font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 12px; }
+  .num { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 11px; }
+  .title { font-size: 15px; font-weight: 600; } .lib { font-size: 13px; } .self.lib { font-weight: 700; }
+</style>
+<rect class="bg" x="0.5" y="0.5" width="759" height="637" rx="6"/>
+<text class="t title" x="16" y="28">Round trip, 16 B, median (shorter is better; log scale)</text>
+<rect class="lx" x="16" y="41" width="10" height="10" rx="2"/><text class="m" x="30" y="50">Linux x86-64</text>
+<rect class="wn" x="134.4" y="41" width="10" height="10" rx="2"/><text class="m" x="148.4" y="50">Windows</text>
+<rect class="mc" x="216.8" y="41" width="10" height="10" rx="2"/><text class="m" x="230.8" y="50">macOS</text>
+<rect class="la" x="284.8" y="41" width="10" height="10" rx="2"/><text class="m" x="298.8" y="50">Linux ARM64</text>
+<line class="rule" x1="16" x2="744" y1="59.0" y2="59.0"/>
+<text class="self lib" x="16" y="94.0">FastIPC</text>
+<rect class="lx" x="150" y="64" width="34.5" height="11" rx="1.5"/><text class="m num" x="189.5" y="74">163 ns</text>
+<rect class="wn" x="150" y="77" width="33.4" height="11" rx="1.5"/><text class="m num" x="188.4" y="87">160 ns</text>
+<rect class="mc" x="150" y="90" width="15.8" height="11" rx="1.5"/><text class="m num" x="170.8" y="100">125 ns</text>
+<rect class="la" x="150" y="103" width="15.8" height="11" rx="1.5"/><text class="m num" x="170.8" y="113">125 ns</text>
+<line class="rule" x1="16" x2="744" y1="121.0" y2="121.0"/>
+<text class="t lib" x="16" y="156.0">Aeron</text>
+<rect class="lx" x="150" y="126" width="46.3" height="11" rx="1.5"/><text class="m num" x="201.3" y="136">192 ns</text>
+<rect class="wn" x="150" y="139" width="45.8" height="11" rx="1.5"/><text class="m num" x="200.8" y="149">191 ns</text>
+<rect class="mc" x="150" y="152" width="15.8" height="11" rx="1.5"/><text class="m num" x="170.8" y="162">125 ns</text>
+<rect class="la" x="150" y="165" width="15.8" height="11" rx="1.5"/><text class="m num" x="170.8" y="175">125 ns</text>
+<line class="rule" x1="16" x2="744" y1="183.0" y2="183.0"/>
+<text class="t lib" x="16" y="218.0">iceoryx2</text>
+<rect class="lx" x="150" y="188" width="151.8" height="11" rx="1.5"/><text class="m num" x="306.8" y="198">854 ns</text>
+<rect class="wn" x="150" y="201" width="155.3" height="11" rx="1.5"/><text class="m num" x="310.3" y="211">897 ns</text>
+<rect class="mc" x="150" y="214" width="124.8" height="11" rx="1.5"/><text class="m num" x="279.8" y="224">583 ns</text>
+<rect class="la" x="150" y="227" width="129.7" height="11" rx="1.5"/><text class="m num" x="284.7" y="237">625 ns</text>
+<line class="rule" x1="16" x2="744" y1="245.0" y2="245.0"/>
+<text class="t lib" x="16" y="280.0">Boost.Interprocess</text>
+<rect class="lx" x="150" y="250" width="196.2" height="11" rx="1.5"/><text class="m num" x="351.2" y="260">1.6 µs</text>
+<rect class="wn" x="150" y="263" width="135.7" height="11" rx="1.5"/><text class="m num" x="290.7" y="273">680 ns</text>
+<rect class="mc" x="150" y="276" width="93.6" height="11" rx="1.5"/><text class="m num" x="248.6" y="286">375 ns</text>
+<rect class="la" x="150" y="289" width="191.7" height="11" rx="1.5"/><text class="m num" x="346.7" y="299">1.5 µs</text>
+<line class="rule" x1="16" x2="744" y1="307.0" y2="307.0"/>
+<text class="t lib" x="16" y="342.0">cpp-ipc</text>
+<rect class="lx" x="150" y="312" width="176.2" height="11" rx="1.5"/><text class="m num" x="331.2" y="322">1.2 µs</text>
+<rect class="wn" x="150" y="325" width="221.9" height="11" rx="1.5"/><text class="m num" x="376.9" y="335">2.3 µs</text>
+<text class="m num" x="150" y="348">—</text>
+<rect class="la" x="150" y="351" width="165.9" height="11" rx="1.5"/><text class="m num" x="320.9" y="361">1.0 µs</text>
+<line class="rule" x1="16" x2="744" y1="369.0" y2="369.0"/>
+<text class="t lib" x="16" y="404.0">Unix socket</text>
+<rect class="lx" x="150" y="374" width="202.6" height="11" rx="1.5"/><text class="m num" x="357.6" y="384">1.7 µs</text>
+<rect class="wn" x="150" y="387" width="245.9" height="11" rx="1.5"/><text class="m num" x="400.9" y="397">3.2 µs</text>
+<rect class="mc" x="150" y="400" width="193.6" height="11" rx="1.5"/><text class="m num" x="348.6" y="410">1.5 µs</text>
+<rect class="la" x="150" y="413" width="195.5" height="11" rx="1.5"/><text class="m num" x="350.5" y="423">1.6 µs</text>
+<line class="rule" x1="16" x2="744" y1="431.0" y2="431.0"/>
+<text class="t lib" x="16" y="466.0">TCP loopback</text>
+<rect class="lx" x="150" y="436" width="256.2" height="11" rx="1.5"/><text class="m num" x="411.2" y="446">3.7 µs</text>
+<rect class="wn" x="150" y="449" width="350.7" height="11" rx="1.5"/><text class="m num" x="505.7" y="459">14 µs</text>
+<rect class="mc" x="150" y="462" width="318.9" height="11" rx="1.5"/><text class="m num" x="473.9" y="472">9.0 µs</text>
+<rect class="la" x="150" y="475" width="237.7" height="11" rx="1.5"/><text class="m num" x="392.7" y="485">2.9 µs</text>
+<line class="rule" x1="16" x2="744" y1="493.0" y2="493.0"/>
+<text class="t lib" x="16" y="528.0">ZeroMQ</text>
+<rect class="lx" x="150" y="498" width="471.2" height="11" rx="1.5"/><text class="m num" x="626.2" y="508">78 µs</text>
+<rect class="wn" x="150" y="511" width="444.2" height="11" rx="1.5"/><text class="m num" x="599.2" y="521">53 µs</text>
+<rect class="mc" x="150" y="524" width="429.8" height="11" rx="1.5"/><text class="m num" x="584.8" y="534">43 µs</text>
+<rect class="la" x="150" y="537" width="403.8" height="11" rx="1.5"/><text class="m num" x="558.8" y="547">30 µs</text>
+<line class="rule" x1="16" x2="744" y1="555.0" y2="555.0"/>
+<text class="t lib" x="16" y="590.0">NNG</text>
+<rect class="lx" x="150" y="560" width="500.4" height="11" rx="1.5"/><text class="m num" x="655.4" y="570">118 µs</text>
+<rect class="wn" x="150" y="573" width="436.1" height="11" rx="1.5"/><text class="m num" x="591.1" y="583">47 µs</text>
+<rect class="mc" x="150" y="586" width="389.1" height="11" rx="1.5"/><text class="m num" x="544.1" y="596">24 µs</text>
+<rect class="la" x="150" y="599" width="510.0" height="11" rx="1.5"/><text class="m num" x="665.0" y="609">135 µs</text>
+</svg>

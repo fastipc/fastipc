@@ -1,0 +1,7 @@
+{
+  "windows_host": {
+    "sandbox_path": "/mnt/c/WSL2WindowsHostSandbox/fastipc",
+    "python_exe": "/mnt/c/Python313/python.exe",
+    "dotnet_exe": "/mnt/c/Program Files/dotnet/dotnet.exe"
+  }
+}

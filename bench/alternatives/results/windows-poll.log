@@ -1,0 +1,189 @@
+stream-16                    fastipc       msgs_per_s=50.17M  lost=0
+stream-16                    fastipc-zerocopy msgs_per_s=50.13M  lost=0
+stream-16                    iceoryx2      msgs_per_s=3.15M  lost=0
+stream-16                    iceoryx2-cxx  msgs_per_s=614.77K  lost=0
+stream-16                    aeron         msgs_per_s=43.39M  lost=0
+stream-16                    zeromq        msgs_per_s=7.35M  lost=0
+stream-16                    zeromq-tcp    msgs_per_s=7.73M  lost=0
+stream-16                    nng           msgs_per_s=30.18K  lost=0
+stream-16                    nng-tcp       msgs_per_s=50.63K  lost=0
+stream-16                    cpp-ipc       msgs_per_s=1.01M  lost=0
+stream-16                    boost         msgs_per_s=3.57M  lost=0
+stream-16                    unix-socket   msgs_per_s=915.25K  lost=0
+stream-16                    tcp-loopback  msgs_per_s=115.17K  lost=0
+stream-1024                  fastipc       msgs_per_s=29.43M  lost=0
+stream-1024                  fastipc-zerocopy msgs_per_s=28.25M  lost=0
+stream-1024                  iceoryx2      msgs_per_s=2.88M  lost=0
+stream-1024                  iceoryx2-cxx  msgs_per_s=596.05K  lost=0
+stream-1024                  aeron         msgs_per_s=22.28M  lost=0
+stream-1024                  zeromq        msgs_per_s=1.20M  lost=0
+stream-1024                  zeromq-tcp    msgs_per_s=502.24K  lost=0
+stream-1024                  nng           msgs_per_s=32.28K  lost=0
+stream-1024                  nng-tcp       msgs_per_s=48.83K  lost=0
+stream-1024                  cpp-ipc       msgs_per_s=197.74K  lost=0
+stream-1024                  boost         msgs_per_s=2.90M  lost=0
+stream-1024                  unix-socket   msgs_per_s=875.86K  lost=0
+stream-1024                  tcp-loopback  msgs_per_s=113.51K  lost=0
+stream-65536                 fastipc       msgs_per_s=492.75K  lost=0
+stream-65536                 fastipc-zerocopy msgs_per_s=463.79K  lost=0
+stream-65536                 iceoryx2      msgs_per_s=408.93K  lost=0
+stream-65536                 iceoryx2-cxx  msgs_per_s=226.89K  lost=0
+stream-65536                 aeron         msgs_per_s=159.33K  lost=0
+stream-65536                 zeromq        msgs_per_s=50.03K  lost=0
+stream-65536                 zeromq-tcp    msgs_per_s=22.82K  lost=0
+stream-65536                 nng           msgs_per_s=25.50K  lost=0
+stream-65536                 nng-tcp       msgs_per_s=22.04K  lost=0
+stream-65536                 cpp-ipc       msgs_per_s=221.31K  lost=0
+stream-65536                 boost         msgs_per_s=262.79K  lost=0
+stream-65536                 unix-socket   msgs_per_s=196.50K  lost=0
+stream-65536                 tcp-loopback  msgs_per_s=52.12K  lost=0
+rtt-16                       fastipc       p50_ns=207ns  p99_ns=325ns  calls_per_s=4.62M
+rtt-16                       fastipc-zerocopy p50_ns=184ns  p99_ns=323ns  calls_per_s=4.77M
+rtt-16                       iceoryx2      p50_ns=897ns  p99_ns=1096ns  calls_per_s=1.13M
+rtt-16                       iceoryx2-cxx  p50_ns=3958ns  p99_ns=6397ns  calls_per_s=248.96K
+rtt-16                       aeron         p50_ns=196ns  p99_ns=258ns  calls_per_s=4.84M
+rtt-16                       zeromq        p50_ns=53.2us  p99_ns=90.7us  calls_per_s=18.32K
+rtt-16                       zeromq-tcp    p50_ns=67.5us  p99_ns=131.7us  calls_per_s=14.41K
+rtt-16                       nng           p50_ns=80.4us  p99_ns=126.8us  calls_per_s=12.22K
+rtt-16                       nng-tcp       p50_ns=49.4us  p99_ns=89.4us  calls_per_s=19.47K
+rtt-16                       cpp-ipc       p50_ns=2434ns  p99_ns=2758ns  calls_per_s=410.58K
+rtt-16                       boost         p50_ns=680ns  p99_ns=1486ns  calls_per_s=1.38M
+rtt-16                       unix-socket   p50_ns=3227ns  p99_ns=4814ns  calls_per_s=298.94K
+rtt-16                       tcp-loopback  p50_ns=14.2us  p99_ns=19.1us  calls_per_s=68.81K
+rtt-1024                     fastipc       p50_ns=481ns  p99_ns=727ns  calls_per_s=1.80M
+rtt-1024                     fastipc-zerocopy p50_ns=421ns  p99_ns=653ns  calls_per_s=1.90M
+rtt-1024                     iceoryx2      p50_ns=1175ns  p99_ns=1422ns  calls_per_s=889.81K
+rtt-1024                     iceoryx2-cxx  p50_ns=4311ns  p99_ns=5734ns  calls_per_s=235.34K
+rtt-1024                     aeron         p50_ns=655ns  p99_ns=872ns  calls_per_s=1.45M
+rtt-1024                     zeromq        p50_ns=56.8us  p99_ns=96.0us  calls_per_s=17.33K
+rtt-1024                     zeromq-tcp    p50_ns=69.9us  p99_ns=140.7us  calls_per_s=13.73K
+rtt-1024                     nng           p50_ns=86.0us  p99_ns=129.6us  calls_per_s=11.39K
+rtt-1024                     nng-tcp       p50_ns=52.2us  p99_ns=94.7us  calls_per_s=18.48K
+rtt-1024                     cpp-ipc       p50_ns=4001ns  p99_ns=4520ns  calls_per_s=248.09K
+rtt-1024                     boost         p50_ns=958ns  p99_ns=1965ns  calls_per_s=984.55K
+rtt-1024                     unix-socket   p50_ns=3753ns  p99_ns=4907ns  calls_per_s=262.06K
+rtt-1024                     tcp-loopback  p50_ns=15.7us  p99_ns=20.2us  calls_per_s=63.35K
+broadcast-1-lossless-16      fastipc       msgs_per_s=48.42M  lost_pct=0.0%  sent_per_s=48.48M
+broadcast-1-lossless-16      fastipc-zerocopy msgs_per_s=38.50M  lost_pct=0.0%  sent_per_s=38.50M
+broadcast-1-lossless-16      iceoryx2      msgs_per_s=3.01M  lost_pct=0.0%  sent_per_s=3.01M
+broadcast-1-lossless-16      iceoryx2-cxx  msgs_per_s=595.23K  lost_pct=0.0%  sent_per_s=595.23K
+broadcast-1-lossless-16      aeron         msgs_per_s=42.12M  lost_pct=0.0%  sent_per_s=42.13M
+broadcast-1-lossless-16      cpp-ipc       msgs_per_s=1.04M  lost_pct=0.0%  sent_per_s=1.04M
+broadcast-1-lossy-16         fastipc       msgs_per_s=49.03M  lost_pct=0.0%  sent_per_s=49.31M
+broadcast-1-lossy-16         iceoryx2      msgs_per_s=3.14M  lost_pct=0.1%  sent_per_s=3.15M
+broadcast-1-lossy-16         iceoryx2-cxx  msgs_per_s=625.95K  lost_pct=0.0%  sent_per_s=625.95K
+broadcast-1-lossy-16         zeromq        msgs_per_s=8.10M  lost_pct=12.7%  sent_per_s=9.40M
+broadcast-1-lossy-16         zeromq-tcp    msgs_per_s=6.93M  lost_pct=56.5%  sent_per_s=17.67M
+broadcast-1-lossy-16         nng           msgs_per_s=30.95K  lost_pct=98.9%  sent_per_s=3.15M
+broadcast-1-lossy-16         nng-tcp       msgs_per_s=49.21K  lost_pct=3.0%  sent_per_s=50.76K
+broadcast-1-lossless-1024    fastipc       msgs_per_s=30.29M  lost_pct=0.0%  sent_per_s=30.29M
+broadcast-1-lossless-1024    fastipc-zerocopy msgs_per_s=21.16M  lost_pct=0.0%  sent_per_s=21.16M
+broadcast-1-lossless-1024    iceoryx2      msgs_per_s=2.86M  lost_pct=0.0%  sent_per_s=2.86M
+broadcast-1-lossless-1024    iceoryx2-cxx  msgs_per_s=584.13K  lost_pct=0.0%  sent_per_s=584.13K
+broadcast-1-lossless-1024    aeron         msgs_per_s=21.32M  lost_pct=0.0%  sent_per_s=21.32M
+broadcast-1-lossless-1024    cpp-ipc       msgs_per_s=212.78K  lost_pct=0.0%  sent_per_s=212.79K
+broadcast-1-lossy-1024       fastipc       msgs_per_s=29.25M  lost_pct=0.7%  sent_per_s=29.45M
+broadcast-1-lossy-1024       iceoryx2      msgs_per_s=2.94M  lost_pct=1.2%  sent_per_s=2.98M
+broadcast-1-lossy-1024       iceoryx2-cxx  msgs_per_s=593.95K  lost_pct=0.0%  sent_per_s=593.95K
+broadcast-1-lossy-1024       zeromq        msgs_per_s=1.14M  lost_pct=89.4%  sent_per_s=10.87M
+broadcast-1-lossy-1024       zeromq-tcp    msgs_per_s=379.85K  lost_pct=96.6%  sent_per_s=11.66M
+broadcast-1-lossy-1024       nng           msgs_per_s=35.79K  lost_pct=98.6%  sent_per_s=2.61M
+broadcast-1-lossy-1024       nng-tcp       msgs_per_s=49.27K  lost_pct=17.8%  sent_per_s=55.50K
+broadcast-4-lossless-16      fastipc       msgs_per_s=38.30M  lost_pct=0.0%  sent_per_s=38.33M
+broadcast-4-lossless-16      fastipc-zerocopy msgs_per_s=34.29M  lost_pct=0.0%  sent_per_s=34.29M
+broadcast-4-lossless-16      iceoryx2      msgs_per_s=1.29M  lost_pct=0.0%  sent_per_s=1.29M
+broadcast-4-lossless-16      iceoryx2-cxx  msgs_per_s=387.45K  lost_pct=0.0%  sent_per_s=387.45K
+broadcast-4-lossless-16      aeron         msgs_per_s=32.49M  lost_pct=0.0%  sent_per_s=32.50M
+broadcast-4-lossless-16      cpp-ipc       msgs_per_s=44.47K  lost_pct=0.0%  sent_per_s=44.36K
+broadcast-4-lossy-16         fastipc       msgs_per_s=30.66M  lost_pct=0.2%  sent_per_s=30.85M
+broadcast-4-lossy-16         iceoryx2      msgs_per_s=1.26M  lost_pct=0.0%  sent_per_s=1.26M
+broadcast-4-lossy-16         iceoryx2-cxx  msgs_per_s=391.30K  lost_pct=0.0%  sent_per_s=391.30K
+broadcast-4-lossy-16         zeromq        msgs_per_s=2.83M  lost_pct=66.8%  sent_per_s=8.50M
+broadcast-4-lossy-16         zeromq-tcp    msgs_per_s=2.08M  lost_pct=81.8%  sent_per_s=12.53M
+broadcast-4-lossy-16         nng           msgs_per_s=18.75K  lost_pct=79.6%  sent_per_s=95.61K
+broadcast-4-lossy-16         nng-tcp       msgs_per_s=5.84K  lost_pct=0.0%  sent_per_s=3.50K
+broadcast-4-lossless-1024    fastipc       msgs_per_s=20.59M  lost_pct=0.0%  sent_per_s=20.60M
+broadcast-4-lossless-1024    fastipc-zerocopy msgs_per_s=18.88M  lost_pct=0.0%  sent_per_s=18.88M
+broadcast-4-lossless-1024    iceoryx2      msgs_per_s=1.27M  lost_pct=0.0%  sent_per_s=1.27M
+broadcast-4-lossless-1024    iceoryx2-cxx  msgs_per_s=401.08K  lost_pct=0.0%  sent_per_s=401.08K
+broadcast-4-lossless-1024    aeron         msgs_per_s=16.62M  lost_pct=0.0%  sent_per_s=16.62M
+broadcast-4-lossless-1024    cpp-ipc       msgs_per_s=8.23K  lost_pct=0.0%  sent_per_s=8.25K
+broadcast-4-lossy-1024       fastipc       msgs_per_s=20.23M  lost_pct=5.0%  sent_per_s=21.29M
+broadcast-4-lossy-1024       iceoryx2      msgs_per_s=1.27M  lost_pct=0.3%  sent_per_s=1.27M
+broadcast-4-lossy-1024       iceoryx2-cxx  msgs_per_s=404.67K  lost_pct=0.0%  sent_per_s=404.67K
+broadcast-4-lossy-1024       zeromq        msgs_per_s=259.27K  lost_pct=97.0%  sent_per_s=8.26M
+broadcast-4-lossy-1024       zeromq-tcp    msgs_per_s=93.94K  lost_pct=99.0%  sent_per_s=9.92M
+broadcast-4-lossy-1024       nng           msgs_per_s=18.15K  lost_pct=88.2%  sent_per_s=152.56K
+broadcast-4-lossy-1024       nng-tcp       msgs_per_s=6.07K  lost_pct=38.4%  sent_per_s=9.72K
+queue-1x1-16                 fastipc       msgs_per_s=28.01M
+queue-1x1-16                 fastipc-zerocopy msgs_per_s=29.80M
+queue-1x1-16                 zeromq        msgs_per_s=7.43M
+queue-1x1-16                 zeromq-tcp    msgs_per_s=7.49M
+queue-1x1-16                 nng           msgs_per_s=31.43K
+queue-1x1-16                 nng-tcp       msgs_per_s=50.34K
+queue-1x1-16                 boost         msgs_per_s=3.90M
+queue-1x1-1024               fastipc       msgs_per_s=20.23M
+queue-1x1-1024               fastipc-zerocopy msgs_per_s=20.77M
+queue-1x1-1024               zeromq        msgs_per_s=1.22M
+queue-1x1-1024               zeromq-tcp    msgs_per_s=503.07K
+queue-1x1-1024               nng           msgs_per_s=32.67K
+queue-1x1-1024               nng-tcp       msgs_per_s=50.18K
+queue-1x1-1024               boost         msgs_per_s=2.56M
+queue-4x4-16                 fastipc       msgs_per_s=62.38M
+queue-4x4-16                 fastipc-zerocopy msgs_per_s=61.53M
+queue-4x4-16                 zeromq        msgs_per_s=32.34M
+queue-4x4-16                 zeromq-tcp    msgs_per_s=28.21M
+queue-4x4-16                 nng           msgs_per_s=121.17K
+queue-4x4-16                 nng-tcp       msgs_per_s=84.14K
+queue-4x4-16                 boost         msgs_per_s=985.33K
+queue-4x4-1024               fastipc       msgs_per_s=41.17M
+queue-4x4-1024               fastipc-zerocopy msgs_per_s=44.53M
+queue-4x4-1024               zeromq        msgs_per_s=3.33M
+queue-4x4-1024               zeromq-tcp    msgs_per_s=1.11M
+queue-4x4-1024               nng           msgs_per_s=125.78K
+queue-4x4-1024               nng-tcp       msgs_per_s=81.03K
+queue-4x4-1024               boost         msgs_per_s=886.48K
+service-1x1-16               fastipc       calls_per_s=2.37M  p50_ns=415ns  p99_ns=536ns
+service-1x1-16               fastipc-zerocopy calls_per_s=2.42M  p50_ns=411ns  p99_ns=540ns
+service-1x1-16               iceoryx2      calls_per_s=888.71K  p50_ns=1127ns  p99_ns=1407ns
+service-1x1-16               iceoryx2-cxx  calls_per_s=237.65K  p50_ns=4220ns  p99_ns=5250ns
+service-1x1-16               zeromq        calls_per_s=18.16K  p50_ns=53.5us  p99_ns=89.8us
+service-1x1-16               zeromq-tcp    calls_per_s=14.57K  p50_ns=66.4us  p99_ns=127.2us
+service-1x1-16               nng           calls_per_s=13.47K  p50_ns=71.6us  p99_ns=125.1us
+service-1x1-16               nng-tcp       calls_per_s=19.57K  p50_ns=49.0us  p99_ns=86.9us
+service-1x1-1024             fastipc       calls_per_s=1.54M  p50_ns=674ns  p99_ns=844ns
+service-1x1-1024             fastipc-zerocopy calls_per_s=1.53M  p50_ns=676ns  p99_ns=855ns
+service-1x1-1024             iceoryx2      calls_per_s=728.14K  p50_ns=1367ns  p99_ns=1740ns
+service-1x1-1024             iceoryx2-cxx  calls_per_s=224.08K  p50_ns=4466ns  p99_ns=6177ns
+service-1x1-1024             zeromq        calls_per_s=17.68K  p50_ns=55.3us  p99_ns=95.6us
+service-1x1-1024             zeromq-tcp    calls_per_s=14.03K  p50_ns=68.9us  p99_ns=127.5us
+service-1x1-1024             nng           calls_per_s=12.95K  p50_ns=74.6us  p99_ns=130.8us
+service-1x1-1024             nng-tcp       calls_per_s=19.07K  p50_ns=50.4us  p99_ns=96.0us
+service-4x1-16               fastipc       calls_per_s=3.98M  p50_ns=978ns  p99_ns=1280ns
+service-4x1-16               fastipc-zerocopy calls_per_s=4.13M  p50_ns=946ns  p99_ns=1236ns
+service-4x1-16               iceoryx2      calls_per_s=1.45M  p50_ns=1820ns  p99_ns=9448ns
+service-4x1-16               iceoryx2-cxx  calls_per_s=371.66K  p50_ns=5489ns  p99_ns=650.4us
+service-4x1-16               zeromq        calls_per_s=37.12K  p50_ns=106.7us  p99_ns=163.2us
+service-4x1-16               zeromq-tcp    calls_per_s=21.46K  p50_ns=192.2us  p99_ns=318.1us
+service-4x1-16               nng           calls_per_s=29.27K  p50_ns=133.6us  p99_ns=200.1us
+service-4x1-16               nng-tcp       calls_per_s=23.43K  p50_ns=132.4us  p99_ns=876.5us
+service-4x1-1024             fastipc       calls_per_s=2.53M  p50_ns=1540ns  p99_ns=2034ns
+service-4x1-1024             fastipc-zerocopy calls_per_s=2.46M  p50_ns=1614ns  p99_ns=1960ns
+service-4x1-1024             iceoryx2      calls_per_s=1.16M  p50_ns=1827ns  p99_ns=57.7us
+service-4x1-1024             iceoryx2-cxx  calls_per_s=396.71K  p50_ns=5720ns  p99_ns=10.5us
+service-4x1-1024             zeromq        calls_per_s=36.11K  p50_ns=109.8us  p99_ns=172.0us
+service-4x1-1024             zeromq-tcp    calls_per_s=21.34K  p50_ns=192.3us  p99_ns=302.8us
+service-4x1-1024             nng           calls_per_s=29.09K  p50_ns=135.3us  p99_ns=204.9us
+service-4x1-1024             nng-tcp       calls_per_s=23.45K  p50_ns=137.2us  p99_ns=818.3us
+service-4x4-16               fastipc       calls_per_s=4.22M  p50_ns=937ns  p99_ns=1618ns
+service-4x4-16               fastipc-zerocopy calls_per_s=4.08M  p50_ns=970ns  p99_ns=1656ns
+service-4x4-16               zeromq        calls_per_s=34.27K  p50_ns=114.7us  p99_ns=164.0us
+service-4x4-16               zeromq-tcp    calls_per_s=23.28K  p50_ns=171.6us  p99_ns=239.5us
+service-4x4-16               nng           calls_per_s=27.07K  p50_ns=143.7us  p99_ns=214.7us
+service-4x4-16               nng-tcp       calls_per_s=36.46K  p50_ns=106.0us  p99_ns=182.7us
+service-4x4-1024             fastipc       calls_per_s=3.41M  p50_ns=1160ns  p99_ns=1813ns
+service-4x4-1024             fastipc-zerocopy calls_per_s=3.28M  p50_ns=1206ns  p99_ns=1873ns
+service-4x4-1024             zeromq        calls_per_s=33.28K  p50_ns=118.8us  p99_ns=172.9us
+service-4x4-1024             zeromq-tcp    calls_per_s=22.81K  p50_ns=175.0us  p99_ns=244.9us
+service-4x4-1024             nng           calls_per_s=26.86K  p50_ns=145.5us  p99_ns=218.1us
+service-4x4-1024             nng-tcp       calls_per_s=36.35K  p50_ns=105.8us  p99_ns=186.9us

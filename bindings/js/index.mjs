@@ -1,0 +1,36 @@
+// The ES module entry of fipc: the same binding as index.cjs, with named exports.
+import fipc from './index.cjs';
+
+export const {
+  createStream,
+  connectStream,
+  connectStreamSync,
+  createBroadcast,
+  joinBroadcast,
+  joinBroadcastSync,
+  createQueue,
+  joinQueue,
+  joinQueueSync,
+  createService,
+  joinService,
+  joinServiceSync,
+  Listener,
+  Queue,
+  Service,
+  Connection,
+  FipcError,
+  Result,
+  resultStr,
+  NO_WAIT,
+  FOREVER,
+  SUBSCRIBER_LOSSY,
+  SUBSCRIBER_GATED,
+  PRODUCER,
+  CONSUMER,
+  CLIENT,
+  SERVER,
+  version,
+  library,
+  addon,
+} = fipc;
+export default fipc;

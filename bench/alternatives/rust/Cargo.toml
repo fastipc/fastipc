@@ -1,0 +1,14 @@
+[package]
+name = "alt_bench_iceoryx2"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "alt_bench's roles for iceoryx2, through its native Rust API"
+
+[dependencies]
+iceoryx2 = "=0.10.0"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "thin"

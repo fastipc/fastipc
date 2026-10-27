@@ -1,0 +1,4 @@
+# The benchmark builds with any Rust 1.85 or newer (rust-version); development uses the current stable release.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
