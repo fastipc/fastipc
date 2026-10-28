@@ -1107,7 +1107,7 @@ def rock_of(path: Path) -> Optional[Path]:
 
 # ===== JavaScript (the npm package) =====
 
-NPM_PACKAGE = "fipc"
+NPM_PACKAGE = "fipc-js"
 # rid -> the npm package's folder for that platform (Node's process.platform-process.arch), where index.cjs looks for
 # the addon and the library
 NPM_PLATFORMS = {"linux-x64": "linux-x64", "win-x64": "win32-x64", "osx-arm64": "darwin-arm64",
@@ -1194,7 +1194,7 @@ def npm_tarball(version: str) -> str:
 
 def build_npm(repo: Path, libraries: Dict[str, Path], addons: Dict[str, Path], out_dir: Path, work: Path) -> Path:
     """The npm package: bindings/js's entries, types and README, the LICENSE, and every platform's addon and library in
-    prebuilds/<platform-arch>/, packed by `npm pack` into out_dir (fipc-<version>.tgz)."""
+    prebuilds/<platform-arch>/, packed by `npm pack` into out_dir (fipc-js-<version>.tgz)."""
     binding = repo / "bindings" / "js"
     staging = work / "npm"
     if staging.exists():
@@ -1279,7 +1279,7 @@ def check_npm(tarball: Path, version: str, libraries: Dict[str, Path], addons: D
 JS_SMOKE_PROGRAM = r"""// A server (this process) and a client (a second process, this script with the name as its argument)
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import fipc, { connectStream, createStream } from 'fipc';
+import fipc, { connectStream, createStream } from 'fipc-js';
 
 const name = process.argv[2];
 if (name) {
@@ -1354,7 +1354,7 @@ def smoke_npm(tarball: Path, library: Optional[Path]) -> None:
 
 
 def npm_tarball_of(path: Path) -> Optional[Path]:
-    """The npm package a path names (fipc-<version>.tgz); None for another file."""
+    """The npm package a path names (fipc-js-<version>.tgz); None for another file."""
     if path.name.startswith(f"{NPM_PACKAGE}-") and path.name.endswith(".tgz"):
         return path
     return None

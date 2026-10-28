@@ -1,6 +1,6 @@
 # fipc for JavaScript
 
-[![npm](https://img.shields.io/npm/v/fipc)](https://www.npmjs.com/package/fipc)
+[![npm](https://img.shields.io/npm/v/fipc-js)](https://www.npmjs.com/package/fipc-js)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/fastipc/fastipc/blob/main/LICENSE)
 
 Messages between processes on one machine, through shared memory: the JavaScript binding of
@@ -27,10 +27,10 @@ its engine, a tool and a game, without a socket.
 ## Installation
 
 ```bash
-npm install fipc
+npm install fipc-js
 ```
 
-One package for Node.js 22 or newer, Bun and Deno (`import { createStream } from "npm:fipc"`, with `--allow-ffi`): the
+One package for Node.js 22 or newer, Bun and Deno (`import { createStream } from "npm:fipc-js"`, with `--allow-ffi`): the
 binding is one Node-API addon, which all three runtimes load, so nothing is compiled when it is installed and there is
 no install script. TypeScript declarations are included, for ES modules (`import`) and CommonJS (`require`). The
 package carries the addon and the native library for Windows x64 (Windows 11 / Server 2022 or newer) and Linux x64
@@ -41,7 +41,7 @@ AMD Zen or later), for Linux on ARM64 (glibc 2.34 or newer) and for macOS 14.4 o
 
 ```js
 // server.mjs
-import { createStream } from "fipc";
+import { createStream } from "fipc-js";
 
 const listener = createStream("my_channel", 1 << 20); // rings of 1 MiB each way
 const conn = await listener.accept(); // waits for a client; the event loop runs meanwhile
@@ -53,7 +53,7 @@ listener.close();
 
 ```js
 // client.mjs
-import { connectStream } from "fipc";
+import { connectStream } from "fipc-js";
 
 const conn = await connectStream("my_channel", 5000); // waits up to 5 s for the server
 await conn.send("ping");
@@ -65,7 +65,7 @@ Run each in its own terminal (`node server.mjs`, then `node client.mjs`; `bun` r
 -A`); in a checkout of the repository they are `examples/server.mjs` and `examples/client.mjs`, run in this folder.
 The Zig, C, C++, Python, C#, Java, Rust, Lua and Go clients of the [repository's
 README](https://github.com/fastipc/fastipc#examples) work against this server too, and this client against their
-servers. In CommonJS, `const { createStream, connectStream } = require("fipc")`.
+servers. In CommonJS, `const { createStream, connectStream } = require("fipc-js")`.
 
 The calls are grouped by kind. A **stream** (`createStream`, a listener's `accept`, `connectStream`) connects a server
 and one client at a time. A **broadcast** (`createBroadcast`, `joinBroadcast`), a **work queue** (`createQueue`,
@@ -169,7 +169,7 @@ capacity, the connections' `maxPiece`).
 
 ```js
 // publisher.mjs
-import { createBroadcast } from "fipc";
+import { createBroadcast } from "fipc-js";
 
 // 64 KiB of messages, up to 8 subscribers; one that holds the publisher back 5 s is dropped
 const publisher = createBroadcast("my_broadcast", 1 << 16, 8, 5000);
@@ -180,7 +180,7 @@ publisher.close(); // ends the broadcast: subscribers get FIPC_DISCONNECTED afte
 
 ```js
 // subscriber.mjs
-import { SUBSCRIBER_GATED, joinBroadcast } from "fipc";
+import { SUBSCRIBER_GATED, joinBroadcast } from "fipc-js";
 
 // gated: misses nothing (the publisher waits for it)
 const subscriber = await joinBroadcast("my_broadcast", SUBSCRIBER_GATED, 5000);
@@ -239,7 +239,7 @@ queue until a consumer takes them.
 
 ```js
 // producer.mjs
-import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc";
+import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc-js";
 
 // 4 KiB of messages per producer, 1 producer and 1 consumer: this process owns the queue and is its producer
 const queue = createQueue("my_queue", 4096, 1, 1);
@@ -252,7 +252,7 @@ queue.close(); // ends the queue: the consumer gets FIPC_DISCONNECTED after the 
 
 ```js
 // consumer.mjs
-import { CONSUMER, joinQueue } from "fipc";
+import { CONSUMER, joinQueue } from "fipc-js";
 
 const consumer = await joinQueue("my_queue", CONSUMER, 5000);
 for (;;) {
@@ -330,7 +330,7 @@ a server never waits for a client. Requests and replies are of one piece, 1 to `
 
 ```js
 // service_server.mjs
-import { SERVER, createService, joinService } from "fipc";
+import { SERVER, createService, joinService } from "fipc-js";
 
 // 4 KiB per client, requests and replies of up to 256 bytes, 1 client and 1 server: this process owns the service
 // and is its server
@@ -346,7 +346,7 @@ service.close(); // ends the service: the client still receives the replies sent
 
 ```js
 // service_client.mjs
-import { CLIENT, joinService } from "fipc";
+import { CLIENT, joinService } from "fipc-js";
 
 const client = await joinService("my_service", CLIENT, 5000);
 for (let i = 1; i <= 3; i++) {

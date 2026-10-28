@@ -1397,7 +1397,7 @@ Examples:
   devtool package java --smoke     # the Maven artifact (jar, sources, javadoc, POM) in zig-out/packages/maven, tried
   devtool package rust --smoke     # the crates fipc-sys and fipc in zig-out/packages, tried
   devtool package lua --smoke      # the rock (rockspec, source rock, archive) in zig-out/packages, tried
-  devtool package js --smoke       # the npm package (fipc-<version>.tgz) in zig-out/packages, tried with Node.js,
+  devtool package js --smoke       # the npm package (fipc-js-<version>.tgz) in zig-out/packages, tried with Node.js,
                                    #   Bun and Deno where installed
   devtool package go --smoke       # the Go module's tree (zig-out/packages/go), tried from a file proxy
   devtool package csharp --linux-lib L --windows-lib W   # the NuGet package from given libraries (release.yml)

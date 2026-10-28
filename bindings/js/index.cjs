@@ -5,7 +5,7 @@
  * and services, whose clients' requests each go to one of a pool of servers, which replies. One Node-API addon
  * (fipc.node) over the C API of include/fipc.h, the same file for all three runtimes.
  *
- *     const fipc = require('fipc');   // or: import { createStream, connectStream, ... } from 'fipc'
+ *     const fipc = require('fipc-js');   // or: import { createStream, connectStream, ... } from 'fipc-js'
  *
  *     const listener = fipc.createStream('my_channel', 1 << 20);        // the server: rings of 1 MiB each way
  *     const conn = await listener.accept();                             // waits for a client

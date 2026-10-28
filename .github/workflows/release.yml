@@ -3,7 +3,7 @@ name: Release
 # A pushed tag v<version> (v1.0.0) builds, checks and smoke-tests every package on Linux (x86-64 and ARM64), Windows
 # and macOS, waits for a maintainer's approval (the approve job), then publishes them all: the wheels to PyPI
 # (fipc-python), the NuGet package (Fipc), the Maven artifact to Maven Central (io.github.fastipc:fipc), the crates to
-# crates.io (fipc-sys, fipc), the rock to LuaRocks (fipc), the npm package to npm (fipc), the Go module as the tag
+# crates.io (fipc-sys, fipc), the rock to LuaRocks (fipc), the npm package to npm (fipc-js), the Go module as the tag
 # bindings/go/v<version> (github.com/fastipc/fastipc/bindings/go), and the C/C++ archives (the header and the libraries) and the
 # rock's archive to the tag's GitHub release. The approval needs every build job, so a tag publishes nothing unless
 # every package passed. A run by hand builds and smoke-tests the packages of the chosen ref, and publishes only when
@@ -695,7 +695,7 @@ jobs:
       - name: Smoke-test the rock
         run: python devtool.py smoke rock/*.src.rock
 
-  # The npm package (fipc): the JavaScript binding with every platform's Node-API addon and library in
+  # The npm package (fipc-js): the JavaScript binding with every platform's Node-API addon and library in
   # prebuilds/<platform>-<arch>/. The addons are zig build dist's (they link nothing of Node.js, so one host builds
   # every platform's), the libraries the wheel jobs built; then installed by npm into a fresh project on each OS for a
   # round trip between two Node.js processes
@@ -748,7 +748,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: npm
-          path: zig-out/packages/fipc-*.tgz
+          path: zig-out/packages/fipc-js-*.tgz
           if-no-files-found: error
 
   npm-windows:
@@ -1172,7 +1172,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: npm
-      url: https://www.npmjs.com/package/fipc
+      url: https://www.npmjs.com/package/fipc-js
     permissions:
       contents: read
       id-token: write  # npm provenance
@@ -1194,10 +1194,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           version=${GITHUB_REF_NAME#v}
-          if npm view "fipc@$version" version > /dev/null 2>&1; then
-            echo "fipc $version is on npm already"
+          if npm view "fipc-js@$version" version > /dev/null 2>&1; then
+            echo "fipc-js $version is on npm already"
           else
-            npm publish "npm/fipc-$version.tgz" --provenance --access public
+            npm publish "./npm/fipc-js-$version.tgz" --provenance --access public
           fi
 
   # The Go module: Go takes a module from its repository's tags (the module proxy fetches it, pkg.go.dev learns of it
@@ -1414,10 +1414,11 @@ jobs:
       url: https://luarocks.org/modules/fastipc/fipc
     steps:
       - name: Setup LuaRocks
-        # luarocks upload needs only LuaRocks itself (with any Lua) and curl
+        # luarocks upload needs LuaRocks (with any Lua), curl and a JSON module (dkjson, pure Lua)
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends luarocks
+          sudo luarocks install dkjson
 
       - name: Download the rock
         uses: actions/download-artifact@v4

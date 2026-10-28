@@ -1,5 +1,5 @@
 // service_server.mjs
-import { SERVER, createService, joinService } from "fipc";
+import { SERVER, createService, joinService } from "fipc-js";
 
 // 4 KiB per client, requests and replies of up to 256 bytes, 1 client and 1 server: this process owns the service
 // and is its server

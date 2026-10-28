@@ -1,5 +1,5 @@
 // producer.mjs
-import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc";
+import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc-js";
 
 // 4 KiB of messages per producer, 1 producer and 1 consumer: this process owns the queue and is its producer
 const queue = createQueue("my_queue", 4096, 1, 1);

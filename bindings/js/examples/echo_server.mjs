@@ -1,5 +1,5 @@
 // echo_server.mjs
-import { createStream } from "fipc";
+import { createStream } from "fipc-js";
 
 // rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
 const listener = createStream("demo", 1 << 20);

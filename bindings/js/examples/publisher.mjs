@@ -1,5 +1,5 @@
 // publisher.mjs
-import { createBroadcast } from "fipc";
+import { createBroadcast } from "fipc-js";
 
 // 64 KiB of messages, up to 8 subscribers; one that holds the publisher back 5 s is dropped
 const publisher = createBroadcast("my_broadcast", 1 << 16, 8, 5000);

@@ -1,5 +1,5 @@
 {
-  "name": "fipc",
+  "name": "fipc-js",
   "version": "1.0.0",
   "description": "Shared-memory IPC for Node.js, Bun and Deno: streams, broadcasts, work queues and services between processes on one machine (FastIPC)",
   "keywords": [

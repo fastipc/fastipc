@@ -1,5 +1,5 @@
 // subscriber.mjs
-import { SUBSCRIBER_GATED, joinBroadcast } from "fipc";
+import { SUBSCRIBER_GATED, joinBroadcast } from "fipc-js";
 
 // gated: misses nothing (the publisher waits for it)
 const subscriber = await joinBroadcast("my_broadcast", SUBSCRIBER_GATED, 5000);

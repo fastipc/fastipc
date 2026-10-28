@@ -1,5 +1,5 @@
 // consumer.mjs
-import { CONSUMER, joinQueue } from "fipc";
+import { CONSUMER, joinQueue } from "fipc-js";
 
 const consumer = await joinQueue("my_queue", CONSUMER, 5000);
 for (;;) {

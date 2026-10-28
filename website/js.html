@@ -3,22 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)</title>
-<meta name="description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
+<title>FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc-js)</title>
+<meta name="description" content="Shared-memory IPC in JavaScript: the npm package fipc-js, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
 <link rel="canonical" href="https://fastipc.github.io/fastipc/js.html">
 <link rel="icon" href="assets/brand/png/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="assets/brand/fastipc-square.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/brand/png/apple-touch-icon-180.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="FastIPC">
-<meta property="og:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)">
-<meta property="og:description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
+<meta property="og:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc-js)">
+<meta property="og:description" content="Shared-memory IPC in JavaScript: the npm package fipc-js, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
 <meta property="og:url" content="https://fastipc.github.io/fastipc/js.html">
 <meta property="og:image" content="https://fastipc.github.io/fastipc/assets/brand/png/fastipc-square-512.png">
 <meta property="og:image:alt" content="The FastIPC logo">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc)">
-<meta name="twitter:description" content="Shared-memory IPC in JavaScript: the npm package fipc, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
+<meta name="twitter:title" content="FastIPC for JavaScript: shared-memory IPC for Node.js, Bun and Deno (fipc-js)">
+<meta name="twitter:description" content="Shared-memory IPC in JavaScript: the npm package fipc-js, one Node-API addon for Node.js, Bun and Deno, with Promise-based messages that never block the event loop, and TypeScript types.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -54,10 +54,10 @@
 
 <main class="wrap">
   <div class="pagehead">
-    <span class="eyebrow">fipc on npm · import { Listener, Connection } from "fipc"</span>
+    <span class="eyebrow">fipc-js on npm · import { Listener, Connection } from "fipc-js"</span>
     <h1>JavaScript</h1>
     <p class="lede">One Node-API addon for Node.js 22+, Bun and Deno 2: <code>createStream</code> and <code>connectStream</code> give streams, connections with copied and zero-copy messages; <code>createBroadcast</code> and <code>joinBroadcast</code> broadcasts; <code>createQueue</code> and <code>joinQueue</code> work queues; <code>createService</code> and <code>joinService</code> services, whose clients' requests each go to one of a pool of servers, which replies. Every call that may wait returns a Promise and leaves the event loop running; a <code>Sync</code> form waits on the calling thread. A call the library refuses fails with a <code>FipcError</code> whose <code>code</code> names the result. TypeScript types included; nothing is compiled when you install it. The package carries the addon and the native library for Windows x64, Linux x64 and ARM64 (glibc 2.34+) and macOS 14.4+ on Apple Silicon.</p>
-    <div class="install" style="max-width:620px"><span class="lang">npm</span><code>npm install fipc</code><button class="copy" type="button" data-copy="npm install fipc">copy</button></div>
+    <div class="install" style="max-width:620px"><span class="lang">npm</span><code>npm install fipc-js</code><button class="copy" type="button" data-copy="npm install fipc-js">copy</button></div>
     <nav class="toc" aria-label="On this page">
       <a href="#hello">Server and client</a><a href="#messages">Messages</a><a href="#async">Async and Sync</a><a href="#errors">Errors and timeouts</a><a href="#zerocopy">Zero-copy</a><a href="#batches">Batches</a><a href="#broadcast">Broadcast</a><a href="#queue">Work queue</a><a href="#service">Service</a><a href="#interop">Any language</a><a href="#lifetimes">Lifetimes and workers</a><a href="#setup">Node.js, Bun, Deno</a><a href="#reference">Reference</a>
     </nav>
@@ -68,7 +68,7 @@
     <p class="intro">Start the two in either order, in two terminals (<code>node server.mjs</code>, <code>node client.mjs</code>; <code>bun</code> and <code>deno run -A</code> run them as they are): <code>connectStream</code> waits up to its timeout, in milliseconds, for a server to create the stream and accept; a call without a timeout waits as long as it takes. The pair makes the exchange every example on this site makes, the message <code>ping</code>, answered in upper case: this client works with any language's server, and this server with any language's client.</p>
     <div class="cols-2">
       <div class="code"><div class="label"><span>server.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { createStream } from "fipc";
+<pre><code class="language-javascript">import { createStream } from "fipc-js";
 
 const listener = createStream("my_channel", 1 &lt;&lt; 20); // rings of 1 MiB each way
 const conn = await listener.accept(); // waits for a client; the event loop runs meanwhile
@@ -77,7 +77,7 @@ await conn.send(message.toString().toUpperCase());
 conn.close();
 listener.close();</code></pre></div>
       <div class="code"><div class="label"><span>client.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { connectStream } from "fipc";
+<pre><code class="language-javascript">import { connectStream } from "fipc-js";
 
 const conn = await connectStream("my_channel", 5000); // waits up to 5 s for the server
 await conn.send("ping");
@@ -91,7 +91,7 @@ conn.close();</code></pre></div>
     <p class="intro">A connection carries messages: <code>send</code> takes a message of any size, a string (sent as UTF-8), a <code>Buffer</code> or any <code>TypedArray</code>, a <code>DataView</code> or an <code>ArrayBuffer</code>, and <code>receive</code> resolves to each one whole, as a new <code>Buffer</code>. A message longer than the ring travels in pieces and arrives whole. This server echoes every message back until its client leaves, which ends its next <code>receive</code> with <code>FIPC_DISCONNECTED</code>.</p>
     <div class="cols-2">
       <div class="code"><div class="label"><span>echo_server.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { createStream } from "fipc";
+<pre><code class="language-javascript">import { createStream } from "fipc-js";
 
 // rings of 1 MiB each way: a power of two, 1 KiB to 2 GiB
 const listener = createStream("demo", 1 &lt;&lt; 20);
@@ -110,7 +110,7 @@ console.log("client gone");
 conn.close();
 listener.close();</code></pre></div>
       <div class="code"><div class="label"><span>echo_client.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { connectStream } from "fipc";
+<pre><code class="language-javascript">import { connectStream } from "fipc-js";
 
 const conn = await connectStream("demo", 5000);
 for (const word of ["hello", "shared", "memory"]) {
@@ -208,7 +208,7 @@ for (const message of await peer.receiveMany(64)) { // every message already the
     <p class="intro">A broadcast sends every message of one publisher to each of its subscribers, in any processes of the user; each message is stored once, in memory every subscriber maps. Messages are of one piece, up to a quarter of the capacity (<code>maxPiece</code>). <code>createBroadcast(name, capacity, maxSubscribers, maxStall)</code> returns the publisher, a connection whose sends go to every joined subscriber and the broadcast's one handle. A subscriber joins with <code>joinBroadcast</code>, on a thread of its own, and the publisher's process admits it on a thread of the library's, so no call of the publisher's waits for it (the publisher's own thread may join too, even with <code>joinBroadcastSync</code>). The publisher waits for its subscriber (<code>publisher.waitForMembers(1)</code> resolves to the count once at least one has joined; at <code>FIPC_TIMEOUT</code> or <code>FIPC_CANCELLED</code> the error's <code>count</code> is the count) before it sends <code>tick 1</code> to <code>tick 3</code>; closing the publisher ends the broadcast and frees its name. The subscriber joins gated (<code>SUBSCRIBER_GATED</code>), so it misses nothing (the publisher waits for it), and receives until <code>FIPC_DISCONNECTED</code>, which comes after the last message. A gated one that holds the publisher back for the broadcast's <code>maxStall</code> ms is unsubscribed (<code>FIPC_UNSUBSCRIBED</code>); leaving <code>maxStall</code> out never unsubscribes.</p>
     <div class="cols-2">
       <div class="code"><div class="label"><span>publisher.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { createBroadcast } from "fipc";
+<pre><code class="language-javascript">import { createBroadcast } from "fipc-js";
 
 // 64 KiB of messages, up to 8 subscribers; one that holds the publisher back 5 s is dropped
 const publisher = createBroadcast("my_broadcast", 1 &lt;&lt; 16, 8, 5000);
@@ -216,7 +216,7 @@ await publisher.waitForMembers(1); // waits for the first subscriber; the event 
 for (let i = 1; i &lt;= 3; i++) await publisher.send(`tick ${i}`);
 publisher.close(); // ends the broadcast: subscribers get FIPC_DISCONNECTED after the ticks</code></pre></div>
       <div class="code"><div class="label"><span>subscriber.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { SUBSCRIBER_GATED, joinBroadcast } from "fipc";
+<pre><code class="language-javascript">import { SUBSCRIBER_GATED, joinBroadcast } from "fipc-js";
 
 // gated: misses nothing (the publisher waits for it)
 const subscriber = await joinBroadcast("my_broadcast", SUBSCRIBER_GATED, 5000);
@@ -252,7 +252,7 @@ subscriber.close();</code></pre></div>
     <p class="intro">A work queue takes messages from up to 63 producers and hands each to one of up to 64 consumers, in any processes of the user. Each producer has a ring of its own; a consumer takes a message of any producer, and the queue promises no order. Messages are of one piece, up to a quarter of the capacity (<code>maxPiece</code>), and wait in the queue until a consumer takes them. Each message goes to one consumer, and again, to another, only if that consumer's process ends before acknowledging it (<a href="#queue-delivery">delivery</a>, below). Here the producer owns the queue (<code>createQueue(name, capacity, maxProducers, maxConsumers)</code> returns it) and joins it as a producer (<code>joinQueue</code> with <code>PRODUCER</code>): the owner's process admits every joiner on a thread of the library's, its own included, so one thread can own a queue and produce, even with the <code>Sync</code> calls. It sends <code>job 1</code> to <code>job 3</code>, which wait in the queue, then waits for the consumer (<code>queue.waitForMembers(CONSUMER, 1)</code>; a role left out, or 0, counts both), so the two start in either order. Closing the queue ends it: the consumer receives what is left, then <code>FIPC_DISCONNECTED</code>, and a producer's sends fail with <code>FIPC_DISCONNECTED</code> from then on; a producer's or a consumer's close never ends it. <b>The garbage collector never closes a queue</b>: a queue lives until <code>close()</code> or the end of its process (of its worker thread, for one a <code>Worker</code> created), and dropping the object doesn't end it. A consumer receives copied or in place (<code>receiveAcquire</code>).</p>
     <div class="cols-2">
       <div class="code"><div class="label"><span>producer.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc";
+<pre><code class="language-javascript">import { CONSUMER, PRODUCER, createQueue, joinQueue } from "fipc-js";
 
 // 4 KiB of messages per producer, 1 producer and 1 consumer: this process owns the queue and is its producer
 const queue = createQueue("my_queue", 4096, 1, 1);
@@ -262,7 +262,7 @@ await queue.waitForMembers(CONSUMER, 1); // waits for the consumer to join; the 
 producer.close();
 queue.close(); // ends the queue: the consumer gets FIPC_DISCONNECTED after the jobs</code></pre></div>
       <div class="code"><div class="label"><span>consumer.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { CONSUMER, joinQueue } from "fipc";
+<pre><code class="language-javascript">import { CONSUMER, joinQueue } from "fipc-js";
 
 const consumer = await joinQueue("my_queue", CONSUMER, 5000);
 for (;;) {
@@ -302,7 +302,7 @@ consumer.close();</code></pre></div>
     <p class="intro">A service takes requests from up to 64 clients and hands each to one of up to 64 servers, in any processes of the user; the server that took a request replies to it, and the reply goes back to the client that sent it. A server waits for the requests of every client at once (one <code>receive</code>), and the servers of a pool share the load: each takes the next request of any client. Each client has a ring of its own, which holds its requests and the room for their replies, so a server never waits for a client. Requests and replies are of one piece, 1 to <code>maxMessage</code> bytes, the owner's choice (<code>maxPiece</code>). Here the server creates the service (<code>createService(name, capacity, maxMessage, maxClients, maxServers)</code> returns it), joins it as its server (<code>joinService</code> with <code>SERVER</code>: the owner's process admits every joiner on a thread of the library's, its own included, so one thread can own a service and serve) and answers three requests with their uppercase. The client joins (<code>CLIENT</code>) and calls <code>ping 1</code> to <code>ping 3</code>: <code>call</code> sends a request and resolves to its reply. <b>The service's <code>close()</code> ends it</b>: clients' sends and servers' receives fail with <code>FIPC_DISCONNECTED</code>, and a client receives the replies that came before the end, then <code>FIPC_DISCONNECTED</code>; a client's or a server's close never ends the service. <b>The garbage collector never closes a service</b>: a service lives until <code>close()</code> or the end of its process (of its worker thread, for one a <code>Worker</code> created), and dropping the object doesn't end it.</p>
     <div class="cols-2">
       <div class="code"><div class="label"><span>service_server.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { SERVER, createService, joinService } from "fipc";
+<pre><code class="language-javascript">import { SERVER, createService, joinService } from "fipc-js";
 
 // 4 KiB per client, requests and replies of up to 256 bytes, 1 client and 1 server: this process owns the service
 // and is its server
@@ -315,7 +315,7 @@ for (let i = 0; i &lt; 3; i++) { // three requests, then the end
 server.close();
 service.close(); // ends the service: the client still receives the replies sent</code></pre></div>
       <div class="code"><div class="label"><span>service_client.mjs</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">import { CLIENT, joinService } from "fipc";
+<pre><code class="language-javascript">import { CLIENT, joinService } from "fipc-js";
 
 const client = await joinService("my_service", CLIENT, 5000);
 for (let i = 1; i &lt;= 3; i++) {
@@ -375,7 +375,7 @@ try {
 bun client.mjs
 deno run --allow-ffi --allow-read --allow-env client.mjs</code></pre></div>
         <div class="code"><div class="label"><span>CommonJS</span><button class="copy" type="button">copy</button></div>
-<pre><code class="language-javascript">const { createStream, connectStream } = require("fipc");</code></pre></div>
+<pre><code class="language-javascript">const { createStream, connectStream } = require("fipc-js");</code></pre></div>
       </div>
     </div>
   </section>
@@ -429,7 +429,7 @@ deno run --allow-ffi --allow-read --allow-env client.mjs</code></pre></div>
       <a href="https://central.sonatype.com/artifact/io.github.fastipc/fipc">Maven Central</a>
       <a href="https://crates.io/crates/fipc">crates.io</a>
       <a href="https://luarocks.org/modules/fastipc/fipc">LuaRocks</a>
-      <a href="https://www.npmjs.com/package/fipc">npm</a>
+      <a href="https://www.npmjs.com/package/fipc-js">npm</a>
       <a href="https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc">pkg.go.dev</a>
       <a href="https://github.com/fastipc/fastipc/blob/main/LICENSE">License</a>
     </nav>

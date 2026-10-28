@@ -1,5 +1,5 @@
 // service_client.mjs
-import { CLIENT, joinService } from "fipc";
+import { CLIENT, joinService } from "fipc-js";
 
 const client = await joinService("my_service", CLIENT, 5000);
 for (let i = 1; i <= 3; i++) {

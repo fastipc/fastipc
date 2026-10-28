@@ -96,7 +96,7 @@ case, the work queues, the method and each library's configuration, and
 | Java 22+ | `implementation("io.github.fastipc:fipc:1.0.0")` ([Maven Central](https://central.sonatype.com/artifact/io.github.fastipc/fipc)), module and package `io.github.fastipc` | [`bindings/java`](bindings/java/README.md) |
 | Rust 1.85+ | `cargo add fipc` ([crates.io](https://crates.io/crates/fipc)), then `use fipc` | [`bindings/rust`](bindings/rust/README.md) |
 | LuaJIT 2.1 | `luarocks install fipc` ([LuaRocks](https://luarocks.org/modules/fastipc/fipc)), then `require("fipc")` | [`bindings/lua`](bindings/lua/README.md) |
-| JavaScript (Node.js 22+, Bun, Deno 2) | `npm install fipc` ([npm](https://www.npmjs.com/package/fipc)), then `import { createStream, connectStream } from "fipc"` | [`bindings/js`](bindings/js/README.md) |
+| JavaScript (Node.js 22+, Bun, Deno 2) | `npm install fipc-js` ([npm](https://www.npmjs.com/package/fipc-js)), then `import { createStream, connectStream } from "fipc-js"` | [`bindings/js`](bindings/js/README.md) |
 | Go 1.27+ | `go get github.com/fastipc/fastipc/bindings/go/fipc@latest` ([pkg.go.dev](https://pkg.go.dev/github.com/fastipc/fastipc/bindings/go/fipc)), then `import "github.com/fastipc/fastipc/bindings/go/fipc"` | [`bindings/go`](bindings/go/README.md) |
 | C / C++ | The Zig build system (recommended): `zig fetch --save git+https://github.com/fastipc/fastipc`, then link the artifact `fastipc` ([below](#c-and-c)); or, with any compiler, the [GitHub release](https://github.com/fastipc/fastipc/releases/latest)'s archive per OS (headers and library, with `fastipc.lib` on Windows) | [`include/fipc.h`](include/fipc.h), [`include/fipc.hpp`](include/fipc.hpp) |
 | Zig 0.17.0 | `zig fetch --save git+https://github.com/fastipc/fastipc`, then import the module `fastipc` ([below](#zig)) | [`src/zig/root.zig`](src/zig/root.zig) |
@@ -317,7 +317,7 @@ it takes.
 
 ```js
 // server.mjs
-import { createStream } from "fipc";
+import { createStream } from "fipc-js";
 
 const listener = createStream("my_channel", 1 << 20); // rings of 1 MiB each way
 const conn = await listener.accept(); // waits for a client; the event loop runs meanwhile
@@ -329,7 +329,7 @@ listener.close();
 
 ```js
 // client.mjs
-import { connectStream } from "fipc";
+import { connectStream } from "fipc-js";
 
 const conn = await connectStream("my_channel", 5000); // waits up to 5 s for the server
 await conn.send("ping");
@@ -771,7 +771,7 @@ On Linux and macOS, `zig build test test-slow -Denable_tsan=true` runs both tier
 |---|---|
 | `include/fipc.h`, `include/fipc.hpp` | The public C header, the whole API, and the header-only C++20 wrapper over it |
 | `src/zig/` | The library: `c_api.zig` (the exports), `root.zig` (the native Zig API), `core/` (what every kind of connection shares: endpoints, the accept of a client, the admission of a broadcast's, a queue's and a service's joiners, the control connection and the watcher, the switch of the data calls on the kind, shared memory, the waits), `stream/` (SPSC connections: listener, server, client, frames, segment, rings, their waits, the data path), `broadcast/` (pub/sub: owner, subscriber, frames, segment, the publisher's and the subscribers' data paths), `queue/` (MPMC work queues: owner, member, frames, segment, producers, consumers, the returns), `service/` (request and reply: owner, member, frames, segment, clients, servers), `platform/` (Linux, Windows and macOS) |
-| `bindings/` | The Python (CFFI) binding `fipc`, the C# binding `Fipc`, the Java (FFM) binding `io.github.fastipc`, the Rust crates `fipc` and `fipc-sys`, the Lua (LuaJIT FFI) rock `fipc`, the JavaScript (Node-API) npm package `fipc` and the Go module `github.com/fastipc/fastipc/bindings/go` (package `fipc`, without cgo), with their tests |
+| `bindings/` | The Python (CFFI) binding `fipc`, the C# binding `Fipc`, the Java (FFM) binding `io.github.fastipc`, the Rust crates `fipc` and `fipc-sys`, the Lua (LuaJIT FFI) rock `fipc`, the JavaScript (Node-API) npm package `fipc-js` and the Go module `github.com/fastipc/fastipc/bindings/go` (package `fipc`, without cgo), with their tests |
 | `tests/` | The C-API suite (`zig`), the C++ wrapper's tests (`cpp`), the C# integration tests (`csharp`), and the chaos, soak and fuzz harnesses |
 | `examples/` | The examples' servers and clients: downstream projects that depend on this repository, built with `zig build`, in C and C++ (`c-cpp`, no CMake) and Zig (`zig`); and the Python (`python`), C# (`csharp`) and Java (`java`) programs. The Rust, Lua, JavaScript and Go ones are in their bindings' `examples` folders |
 | `bench/` | The benchmark suite (`bench/zig`), the C and C++ benchmark (`bench/c`), the Python, C#, Java, Rust, Lua, JavaScript and Go benchmarks, and the comparison with other IPC libraries (`bench/alternatives`) |

@@ -16,7 +16,7 @@ The smallest program or test that shows it (a failing test in `tests/zig` is ide
 **Environment**
 
 - FastIPC version or commit:
-- Used from: C / Python (`fipc`) / C# (`Fipc`) / Java (`io.github.fastipc:fipc`) / Rust (`fipc`) / Lua (`fipc`) / JavaScript (`fipc`, Node.js / Bun / Deno) / Go (`github.com/fastipc/fastipc/bindings/go/fipc`) / Zig
+- Used from: C / Python (`fipc`) / C# (`Fipc`) / Java (`io.github.fastipc:fipc`) / Rust (`fipc`) / Lua (`fipc`) / JavaScript (`fipc-js`, Node.js / Bun / Deno) / Go (`github.com/fastipc/fastipc/bindings/go/fipc`) / Zig
 - OS and version (for example Ubuntu 24.04, glibc 2.39; Windows 11 24H2; macOS 15.6 on an M2):
 - CPU:
 - Are the two processes the same user? Elevated (Windows)? In containers or namespaces (Linux)?

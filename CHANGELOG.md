@@ -30,7 +30,7 @@ The first public release.
 - **The C++20 wrapper** [`include/fipc.hpp`](include/fipc.hpp) (header-only, no ABI of its own) and the **native Zig
   module** `fastipc` ([`src/zig/root.zig`](src/zig/root.zig)).
 - **Bindings and packages:** Python (`fipc-python` on PyPI), C# (`Fipc` on NuGet), Java (`io.github.fastipc:fipc` on
-  Maven Central), Rust (`fipc` and `fipc-sys` on crates.io), Lua (`fipc` on LuaRocks), JavaScript (`fipc` on npm, for
+  Maven Central), Rust (`fipc` and `fipc-sys` on crates.io), Lua (`fipc` on LuaRocks), JavaScript (`fipc-js` on npm, for
   Node.js 22+, Bun and Deno 2) and Go (`github.com/fastipc/fastipc/bindings/go`), each bundling the library for every
   platform; C/C++ archives per OS on the GitHub release, with `SHA256SUMS`.
 - **Platforms:** Linux x86-64 and ARM64 (glibc 2.34+), Windows 11 / Server 2022+ x64, macOS 14.4+ on Apple Silicon;

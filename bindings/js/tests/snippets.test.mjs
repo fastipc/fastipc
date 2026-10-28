@@ -163,7 +163,7 @@ describe('snippets', () => {
 
   test('CommonJS', () => {
     const require = createRequire(import.meta.url);
-    const { createStream, connectStream } = require("fipc");
+    const { createStream, connectStream } = require("fipc-js");
     assert.equal(typeof createStream, 'function');
     assert.equal(typeof connectStream, 'function');
   });
